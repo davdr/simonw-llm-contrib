@@ -130,6 +130,74 @@ llm keys path
 
 On macOS this will be `~/Library/Application Support/io.datasette.llm/keys.json`. On Linux it may be something like `~/.config/io.datasette.llm/keys.json`.
 
+### Secret store backends
+
+LLM uses a **plugin-based system** for storing API keys. By default, keys are stored in a JSON file (maintaining full backward compatibility with earlier versions), but plugins can provide more secure storage options.
+
+Future plugins will enable integration with:
+- OS keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- Password managers (Gopass, 1Password CLI, etc.)
+- Enterprise secret vaults (HashiCorp Vault, AWS Secrets Manager, etc.)
+
+To see which secret stores are available on your system:
+
+```bash
+llm keys stores
+```
+
+This will show output like:
+
+```
+json (default)
+```
+
+To see more details including how many keys are stored in each:
+
+```bash
+llm keys stores --verbose
+```
+
+Output:
+```
+json (default)
+  Keys stored: 3
+```
+
+#### Using a specific store
+
+When multiple stores are available, you can specify which one to use with the `--store` option:
+
+```bash
+llm keys set openai --store keychain
+llm keys get openai --store keychain
+llm keys list --store keychain
+```
+
+If you don't specify a store, the default store will be used.
+
+#### Configuring the default store
+
+You can configure which store is used by default by creating a `secret-store-config.json` file in your LLM configuration directory. The path can be found by running:
+
+```bash
+llm keys path
+```
+
+Then replace `keys.json` with `secret-store-config.json`. For example:
+
+```json
+{
+  "default_store": "keychain",
+  "stores": {
+    "keychain": {
+      "keychain_name": "llm-keys"
+    }
+  }
+}
+```
+
+The `stores` section allows you to pass configuration options to specific store backends. Check the documentation for each store plugin to see what options are available.
+
 ### Passing keys using the --key option
 
 Keys can be passed directly using the `--key` option, like this:
@@ -153,12 +221,16 @@ Keys can also be set using an environment variable. These are different for diff
 
 For OpenAI models the key will be read from the `OPENAI_API_KEY` environment variable.
 
-The environment variable will be used if no `--key` option is passed to the command and there is not a key configured in `keys.json`
+### Key resolution priority
 
-To use an environment variable in place of the `keys.json` key run the prompt like this:
-```bash
-llm 'my prompt' --key $OPENAI_API_KEY
-```
+When LLM needs an API key, it searches in the following order:
+
+1. **Explicit `--key` parameter** - If you pass `--key value`, that value is used directly or looked up as an alias
+2. **Secret store** - Keys stored via `llm keys set` are retrieved from the configured secret store backend
+3. **Environment variable** - For example, `OPENAI_API_KEY` for OpenAI models
+4. **None** - If no key is found, models that require authentication will fail with an error
+
+This priority system ensures backward compatibility while allowing flexible key management. You can override stored keys by passing `--key` explicitly, or you can use environment variables as a fallback if no stored key exists.
 
 ## Configuration
 

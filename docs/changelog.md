@@ -1,5 +1,29 @@
 # Changelog
 
+## [Unreleased]
+
+### Secret store plugin system
+
+LLM now features a **plugin-based secret store system** for flexible and secure API key storage. The existing JSON file storage has been refactored as the default plugin, maintaining full backward compatibility with earlier versions.
+
+This new system enables plugins to provide alternative storage backends including OS keychains, password managers, and enterprise secret management systems.
+
+- New {ref}`register_secret_stores <plugin-hooks-register-secret-stores>` plugin hook allows plugins to register custom storage backends for API keys and other secrets.
+- New `llm keys stores` command lists available secret store backends. Add `--verbose` to see key counts per store.
+- Added `--store` option to `llm keys set`, `llm keys get`, and `llm keys list` commands to specify which store to use.
+- New `secret-store-config.json` configuration file for setting the default store and store-specific configuration options.
+- New `llm.SecretStore` abstract base class defining the interface for secret store plugins.
+- New functions for plugin developers: `llm.get_secret_store()`, `llm.get_secret_stores()`, `llm.get_default_secret_store_name()`, `llm.register_secret_store()`, and `llm.set_default_secret_store()`.
+- The existing `llm.get_key()` function now uses the secret store system transparently, with an updated priority hierarchy.
+- Updated key resolution priority: explicit `--key` parameter, secret store, environment variable.
+
+### Files added
+
+- `llm/secret_stores.py` - `SecretStore` abstract base class
+- `llm/default_plugins/json_secret_store.py` - Default JSON storage implementation as a plugin
+
+**Breaking changes:** None. All existing functionality and APIs remain unchanged.
+
 (v0_27_1)=
 ## 0.27.1 (2025-08-11)
 

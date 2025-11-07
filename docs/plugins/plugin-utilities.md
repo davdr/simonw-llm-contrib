@@ -19,13 +19,24 @@ You can also add `env="ENV_VAR"` to fall back to looking in that environment var
 ```python
 github_key = llm.get_key(alias="github", env="GITHUB_TOKEN")
 ```
-In some cases you may allow users to provide a key as input, where they could input either the key itself or specify an alias to lookup in `keys.json`. Use the `input=` parameter for that:
+In some cases you may allow users to provide a key as input, where they could input either the key itself or specify an alias to lookup. Use the `input=` parameter for that:
 
 ```python
 github_key = llm.get_key(input=input_from_user, alias="github", env="GITHUB_TOKEN")
 ```
 
 An previous version of function used positional arguments in a confusing order. These are still supported but the new keyword arguments are recommended as a better way to use `llm.get_key()` going forward.
+
+### How it works
+
+`llm.get_key()` uses the {ref}`secret store plugin system <plugin-hooks-register-secret-stores>` to retrieve keys. When a key is looked up, it searches in the following priority order:
+
+1. The `input` parameter if provided (can be the key itself or an alias)
+2. Secret store backends (using the configured default store)
+3. Environment variable specified by the `env` parameter
+4. Returns `None` if not found
+
+This means keys stored via `llm keys set` are automatically retrieved through the configured secret store backend (by default, a JSON file). The system is transparent to plugin developers - you don't need to know which backend users have configured; `llm.get_key()` handles that automatically.
 
 (plugin-utilities-user-dir)=
 ## llm.user_dir()

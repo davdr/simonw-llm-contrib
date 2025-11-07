@@ -283,3 +283,157 @@ llm -f my-fragments:argument
 If multiple fragments are returned they will be used as if the user passed multiple `-f X` arguments to the command.
 
 Multiple fragments are particularly useful for things like plugins that return every file in a directory. If these were concatenated together by the plugin, a change to a single file would invalidate the de-duplicatino cache for that whole fragment. Giving each file its own fragment means we can avoid storing multiple copies of that full collection if only a single file has changed.
+
+(plugin-hooks-register-secret-stores)=
+## register_secret_stores(register)
+
+This hook allows plugins to register custom secret store backends for API key storage.
+
+Secret stores implement the `llm.SecretStore` abstract base class and provide secure storage for API keys and other credentials. The default JSON file storage is implemented as a plugin using this same hook.
+
+This enables plugins to integrate with:
+- Operating system keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- Password managers (Gopass, 1Password CLI, pass, etc.)
+- Enterprise secret management systems (HashiCorp Vault, AWS Secrets Manager, etc.)
+
+### Example implementation
+
+Here's a minimal example of a secret store plugin:
+
+```python
+import llm
+from typing import Optional, List
+
+class ExampleSecretStore(llm.SecretStore):
+    name = "example"  # Used with --store option
+
+    def get(self, key_alias: str) -> Optional[str]:
+        """Retrieve a secret by its alias."""
+        # Your retrieval logic here
+        return None
+
+    def set(self, key_alias: str, value: str) -> None:
+        """Store a secret under the given alias."""
+        # Your storage logic here
+        pass
+
+    def delete(self, key_alias: str) -> bool:
+        """Delete a stored secret. Returns True if deleted, False if not found."""
+        # Your deletion logic here
+        return False
+
+    def list_keys(self) -> List[str]:
+        """List all stored secret aliases (not the values)."""
+        # Your listing logic here
+        return []
+
+    def configure(self, config: dict) -> None:
+        """Optional: Configure the store with user settings."""
+        # This is called with the configuration from secret-store-config.json
+        # For example: {"url": "https://vault.example.com"}
+        pass
+
+@llm.hookimpl
+def register_secret_stores(register):
+    register(ExampleSecretStore())
+```
+
+### Required methods
+
+All secret stores must implement these abstract methods:
+
+- **`get(key_alias: str) -> Optional[str]`** - Retrieve a secret value by its alias. Returns `None` if not found.
+- **`set(key_alias: str, value: str) -> None`** - Store a secret value. Should raise an exception if storage fails.
+- **`delete(key_alias: str) -> bool`** - Delete a secret. Returns `True` if deleted, `False` if the key didn't exist.
+- **`list_keys() -> List[str]`** - Return a list of all stored key aliases (not the actual secret values).
+
+### Optional methods
+
+- **`configure(config: dict) -> None`** - Called when the store is initialized with configuration from `secret-store-config.json`. The default implementation does nothing.
+
+### The `name` attribute
+
+Each store must have a unique `name` attribute. This is used:
+- As the identifier in `--store` CLI options: `llm keys set openai --store example`
+- In the output of `llm keys stores`
+- In configuration files
+
+### Configuration
+
+Users can configure your store by creating a `secret-store-config.json` file. For example:
+
+```json
+{
+  "default_store": "example",
+  "stores": {
+    "example": {
+      "url": "https://api.example.com",
+      "timeout": 30
+    }
+  }
+}
+```
+
+The configuration under `stores.example` will be passed to your store's `configure()` method.
+
+### Real-world example: OS Keychain
+
+Here's how a keychain integration might look:
+
+```python
+import llm
+import keyring  # From the 'keyring' package
+
+class KeychainSecretStore(llm.SecretStore):
+    name = "keychain"
+
+    def __init__(self):
+        self.service_name = "llm-cli"
+
+    def get(self, key_alias: str) -> Optional[str]:
+        return keyring.get_password(self.service_name, key_alias)
+
+    def set(self, key_alias: str, value: str) -> None:
+        keyring.set_password(self.service_name, key_alias, value)
+
+    def delete(self, key_alias: str) -> bool:
+        try:
+            keyring.delete_password(self.service_name, key_alias)
+            return True
+        except keyring.errors.PasswordDeleteError:
+            return False
+
+    def list_keys(self) -> List[str]:
+        # Note: keyring doesn't provide a list API, so this would need
+        # to maintain a separate index
+        return []
+
+    def configure(self, config: dict) -> None:
+        # Allow users to customize the service name
+        if "service_name" in config:
+            self.service_name = config["service_name"]
+
+@llm.hookimpl
+def register_secret_stores(register):
+    register(KeychainSecretStore())
+```
+
+### Using the store
+
+Once installed, users can:
+
+```bash
+# See available stores
+llm keys stores
+
+# Store a key
+llm keys set openai --store example
+
+# Retrieve a key
+llm keys get openai --store example
+
+# List keys in a store
+llm keys list --store example
+```
+
+If set as the default store in configuration, the `--store` option can be omitted.
