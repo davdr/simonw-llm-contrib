@@ -61,23 +61,29 @@ Development is complete when ALL of the following criteria are met:
 - **Total baseline: 72 tests passing**
 
 #### 0.2: Understand Current Test Coverage
-- [ ] Review `tests/test_keys.py` to understand existing test patterns
-- [ ] Identify areas that will need additional testing
-- [ ] Document current coverage of key-related functionality
+- [x] Review `tests/test_keys.py` to understand existing test patterns
+- [x] Identify areas that will need additional testing
+- [x] Document current coverage of key-related functionality
 
-**Expected Result:** Clear understanding of test requirements
+**Expected Result:** Clear understanding of test requirements ✅
+
+**Current Test Coverage:**
+- 7 tests covering: keys path, set, get, list, and priority hierarchy
+- Tests verify file permissions (0o600), JSON format with "// Note" comment
+- Priority: keys.json > environment variables, --key option works as alias or literal
+- Uses CliRunner, tmpdir fixtures for isolation
 
 #### 0.3: Set Up Development Branch
-- [ ] Verify working on correct branch: `claude/design-api-key-protection-011CUsGXrx4sxDN78Hi5YMqF`
-- [ ] Create checkpoint commit before starting changes
-- [ ] Verify can run tests repeatedly without issues
+- [x] Verify working on correct branch: `claude/design-api-key-protection-011CUsGXrx4sxDN78Hi5YMqF`
+- [x] Create checkpoint commit before starting changes
+- [x] Verify can run tests repeatedly without issues
 
-**Expected Result:** Safe development environment established
+**Expected Result:** Safe development environment established ✅
 
-**Success Criteria for Phase 0:**
-- All existing tests pass
-- Test infrastructure is reliable and repeatable
-- Development environment is configured correctly
+**Success Criteria for Phase 0:** ✅
+- [x] All existing tests pass
+- [x] Test infrastructure is reliable and repeatable
+- [x] Development environment is configured correctly
 
 ---
 
