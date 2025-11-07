@@ -253,12 +253,12 @@ def register_secret_stores(register):
 - `llm/hookspecs.py`
 
 **Testing:**
-- [ ] Verify hook specification is registered in plugin manager
-- [ ] Test that plugins can implement this hook
+- [x] Verify hook specification is registered in plugin manager
+- [x] Test that plugins can implement this hook
 
-**Success Criteria:**
-- Hook is properly defined and registered
-- No breaking changes to existing hooks
+**Success Criteria:** ✅
+- [x] Hook is properly defined and registered
+- [x] No breaking changes to existing hooks
 
 #### 2.2: Create Secret Store Registry
 Add to `llm/__init__.py` after existing plugin-related code:
@@ -310,16 +310,16 @@ def set_default_secret_store(name: str):
 - `llm/__init__.py`
 
 **Testing:**
-- [ ] Test registering a mock secret store
-- [ ] Test retrieving registered stores
-- [ ] Test setting default store
-- [ ] Test error handling for invalid stores
-- [ ] Test `get_secret_stores()` returns all stores
+- [x] Test registering a mock secret store
+- [x] Test retrieving registered stores
+- [x] Test setting default store
+- [x] Test error handling for invalid stores
+- [x] Test `get_secret_stores()` returns all stores
 
-**Success Criteria:**
-- Can register and retrieve secret stores
-- Proper error handling for invalid inputs
-- At least 5 unit tests covering registry operations
+**Success Criteria:** ✅
+- [x] Can register and retrieve secret stores
+- [x] Proper error handling for invalid inputs
+- [x] At least 5 unit tests covering registry operations (9 tests created)
 
 ---
 

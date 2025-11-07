@@ -403,6 +403,48 @@ def user_dir():
     return path
 
 
+# Secret store registry
+_secret_stores = {}
+_default_secret_store_name = None
+
+
+def register_secret_store(store):
+    """Register a secret store instance."""
+    if not isinstance(store, SecretStore):
+        raise TypeError(f"store must be a SecretStore instance, got {type(store)}")
+    if not hasattr(store, 'name') or not store.name:
+        raise ValueError("SecretStore must have a non-empty 'name' attribute")
+    _secret_stores[store.name] = store
+
+
+def get_secret_store(name: Optional[str] = None):
+    """
+    Get a secret store by name.
+
+    Args:
+        name: Secret store name, or None for default
+
+    Returns:
+        SecretStore instance, or None if not found
+    """
+    if name is None:
+        name = _default_secret_store_name
+    return _secret_stores.get(name)
+
+
+def get_secret_stores():
+    """Get all registered secret stores."""
+    return dict(_secret_stores)
+
+
+def set_default_secret_store(name: str):
+    """Set the default secret store."""
+    global _default_secret_store_name
+    if name not in _secret_stores:
+        raise ValueError(f"Secret store '{name}' is not registered")
+    _default_secret_store_name = name
+
+
 def set_alias(alias, model_id_or_alias):
     """
     Set an alias to point to the specified model.
