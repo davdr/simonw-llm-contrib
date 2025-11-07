@@ -284,7 +284,9 @@ def test_set_default_secret_store_must_exist():
     try:
         llm._secret_stores.clear()
 
-        with pytest.raises(ValueError, match="Secret store 'nonexistent' is not registered"):
+        with pytest.raises(
+            ValueError, match="Secret store 'nonexistent' is not registered"
+        ):
             llm.set_default_secret_store("nonexistent")
     finally:
         llm._secret_stores.clear()

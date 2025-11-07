@@ -93,7 +93,7 @@ def test_json_secret_store_atomic_write(tmpdir):
     store.set("key2", "value2")
 
     # Check that temp file doesn't exist after write
-    temp_path = keys_path.with_suffix('.tmp')
+    temp_path = keys_path.with_suffix(".tmp")
     assert not temp_path.exists()
 
     # Check final file is valid
@@ -113,7 +113,9 @@ def test_json_secret_store_comment_preservation(tmpdir):
 
     content = json.loads(keys_path.read_text())
     assert "// Note" in content
-    assert content["// Note"] == "This file stores secret API credentials. Do not share!"
+    assert (
+        content["// Note"] == "This file stores secret API credentials. Do not share!"
+    )
 
 
 @pytest.mark.xfail(sys.platform == "win32", reason="Expected to fail on Windows")

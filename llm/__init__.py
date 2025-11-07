@@ -442,7 +442,7 @@ def register_secret_store(store):
     """Register a secret store instance."""
     if not isinstance(store, SecretStore):
         raise TypeError(f"store must be a SecretStore instance, got {type(store)}")
-    if not hasattr(store, 'name') or not store.name:
+    if not hasattr(store, "name") or not store.name:
         raise ValueError("SecretStore must have a non-empty 'name' attribute")
     _secret_stores[store.name] = store
 
@@ -489,13 +489,10 @@ def load_secret_store_config() -> Dict[str, Any]:
     config_path = user_dir() / "secret-store-config.json"
 
     if not config_path.exists():
-        return {
-            "default_store": "json",
-            "stores": {}
-        }
+        return {"default_store": "json", "stores": {}}
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config = json.load(f)
 
         # Validate basic structure
@@ -510,10 +507,7 @@ def load_secret_store_config() -> Dict[str, Any]:
     except (json.JSONDecodeError, IOError, ValueError):
         # Log error but continue with defaults
         # Return defaults on any error
-        return {
-            "default_store": "json",
-            "stores": {}
-        }
+        return {"default_store": "json", "stores": {}}
 
 
 def save_secret_store_config(config: Dict[str, Any]) -> None:
@@ -523,9 +517,9 @@ def save_secret_store_config(config: Dict[str, Any]) -> None:
     # Ensure directory exists
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
-        f.write('\n')
+        f.write("\n")
 
     # Secure permissions
     config_path.chmod(0o600)
@@ -561,9 +555,9 @@ def _load_secret_stores():
     default_store = config.get("default_store", "json")
     if default_store in _secret_stores:
         _default_secret_store_name = default_store
-    elif 'json' in _secret_stores:
+    elif "json" in _secret_stores:
         # Fallback to json if configured default doesn't exist
-        _default_secret_store_name = 'json'
+        _default_secret_store_name = "json"
 
 
 def set_alias(alias, model_id_or_alias):

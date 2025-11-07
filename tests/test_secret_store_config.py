@@ -13,10 +13,7 @@ def test_load_secret_store_config_nonexistent(monkeypatch, tmpdir):
     monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
 
     config = llm.load_secret_store_config()
-    assert config == {
-        "default_store": "json",
-        "stores": {}
-    }
+    assert config == {"default_store": "json", "stores": {}}
 
 
 @pytest.mark.xfail(sys.platform == "win32", reason="Expected to fail on Windows")
@@ -25,12 +22,7 @@ def test_load_secret_store_config_valid(monkeypatch, tmpdir):
     monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
 
     config_path = Path(tmpdir) / "secret-store-config.json"
-    config_data = {
-        "default_store": "custom",
-        "stores": {
-            "json": {"setting": "value"}
-        }
-    }
+    config_data = {"default_store": "custom", "stores": {"json": {"setting": "value"}}}
     config_path.write_text(json.dumps(config_data))
 
     config = llm.load_secret_store_config()
@@ -46,10 +38,7 @@ def test_load_secret_store_config_invalid_json(monkeypatch, tmpdir):
     config_path.write_text("not valid json{")
 
     config = llm.load_secret_store_config()
-    assert config == {
-        "default_store": "json",
-        "stores": {}
-    }
+    assert config == {"default_store": "json", "stores": {}}
 
 
 @pytest.mark.xfail(sys.platform == "win32", reason="Expected to fail on Windows")
@@ -70,12 +59,7 @@ def test_save_secret_store_config(monkeypatch, tmpdir):
     """save_secret_store_config saves config to file."""
     monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
 
-    config_data = {
-        "default_store": "custom",
-        "stores": {
-            "json": {"setting": "value"}
-        }
-    }
+    config_data = {"default_store": "custom", "stores": {"json": {"setting": "value"}}}
 
     llm.save_secret_store_config(config_data)
 
@@ -113,9 +97,7 @@ def test_configuration_applied_to_stores(monkeypatch, tmpdir):
         config_path = Path(tmpdir) / "secret-store-config.json"
         config_data = {
             "default_store": "json",
-            "stores": {
-                "json": {"test_setting": "test_value"}
-            }
+            "stores": {"json": {"test_setting": "test_value"}},
         }
         config_path.write_text(json.dumps(config_data))
 

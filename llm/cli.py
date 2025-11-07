@@ -1384,8 +1384,7 @@ def keys_set(name, value, store):
         if not secret_store:
             available = ", ".join(get_secret_stores().keys())
             raise click.ClickException(
-                f"Secret store '{store}' not found. "
-                f"Available stores: {available}"
+                f"Secret store '{store}' not found. " f"Available stores: {available}"
             )
     else:
         secret_store = get_secret_store()

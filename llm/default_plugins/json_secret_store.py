@@ -56,14 +56,14 @@ class JsonSecretStore(SecretStore):
         # Add comment note
         data = {
             "// Note": "This file stores secret API credentials. Do not share!",
-            **keys
+            **keys,
         }
 
         # Write atomically with secure permissions
-        temp_path = self.keys_path.with_suffix('.tmp')
-        with open(temp_path, 'w') as f:
+        temp_path = self.keys_path.with_suffix(".tmp")
+        with open(temp_path, "w") as f:
             json.dump(data, f, indent=2)
-            f.write('\n')
+            f.write("\n")
 
         # Set permissions before moving
         temp_path.chmod(0o600)
