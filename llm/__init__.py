@@ -29,6 +29,7 @@ from .utils import schema_dsl, Fragment
 from .embeddings import Collection
 from .templates import Template
 from .plugins import pm, load_plugins
+from .secret_stores import SecretStore
 import click
 from typing import Any, Dict, List, Optional, Callable, Type, Union
 import inspect
@@ -57,6 +58,7 @@ __all__ = [
     "Options",
     "Prompt",
     "Response",
+    "SecretStore",
     "Template",
     "Tool",
     "Toolbox",
