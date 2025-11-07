@@ -27,7 +27,14 @@ class JsonSecretStore(SecretStore):
         Args:
             keys_path: Path to keys.json file. If None, uses default location.
         """
-        self.keys_path = keys_path or (llm.user_dir() / "keys.json")
+        self._custom_keys_path = keys_path
+
+    @property
+    def keys_path(self) -> Path:
+        """Get the keys path, re-evaluating user_dir() if needed."""
+        if self._custom_keys_path:
+            return self._custom_keys_path
+        return llm.user_dir() / "keys.json"
 
     def _load_keys(self) -> Dict[str, str]:
         """Load keys from JSON file."""

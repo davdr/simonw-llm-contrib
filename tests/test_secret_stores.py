@@ -132,14 +132,21 @@ class MockSecretStore(SecretStore):
 
 def test_register_secret_store():
     """Can register a secret store."""
-    # Clear any existing stores
-    llm._secret_stores.clear()
+    # Save and restore state
+    orig_stores = dict(llm._secret_stores)
+    orig_loaded = llm._secret_stores_loaded
+    try:
+        llm._secret_stores.clear()
 
-    store = MockSecretStore()
-    llm.register_secret_store(store)
+        store = MockSecretStore()
+        llm.register_secret_store(store)
 
-    assert "mock" in llm._secret_stores
-    assert llm._secret_stores["mock"] is store
+        assert "mock" in llm._secret_stores
+        assert llm._secret_stores["mock"] is store
+    finally:
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._secret_stores_loaded = orig_loaded
 
 
 def test_register_secret_store_requires_secret_store_instance():
@@ -172,67 +179,114 @@ def test_register_secret_store_requires_name():
 
 def test_get_secret_store_by_name():
     """Can retrieve a secret store by name."""
-    llm._secret_stores.clear()
+    orig_stores = dict(llm._secret_stores)
+    orig_loaded = llm._secret_stores_loaded
+    try:
+        llm._secret_stores.clear()
 
-    store = MockSecretStore()
-    llm.register_secret_store(store)
+        store = MockSecretStore()
+        llm.register_secret_store(store)
 
-    retrieved = llm.get_secret_store("mock")
-    assert retrieved is store
+        retrieved = llm.get_secret_store("mock")
+        assert retrieved is store
+    finally:
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._secret_stores_loaded = orig_loaded
 
 
 def test_get_secret_store_returns_none_if_not_found():
     """get_secret_store returns None if store not found."""
-    llm._secret_stores.clear()
-
-    assert llm.get_secret_store("nonexistent") is None
+    orig_stores = dict(llm._secret_stores)
+    orig_loaded = llm._secret_stores_loaded
+    try:
+        llm._secret_stores.clear()
+        assert llm.get_secret_store("nonexistent") is None
+    finally:
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._secret_stores_loaded = orig_loaded
 
 
 def test_get_secret_store_returns_default():
     """get_secret_store with no name returns default store."""
-    llm._secret_stores.clear()
+    orig_stores = dict(llm._secret_stores)
+    orig_loaded = llm._secret_stores_loaded
+    orig_default = llm._default_secret_store_name
+    try:
+        llm._secret_stores.clear()
+        llm._secret_stores_loaded = True  # Prevent reload
 
-    store = MockSecretStore()
-    llm.register_secret_store(store)
-    llm._default_secret_store_name = "mock"
+        store = MockSecretStore()
+        llm.register_secret_store(store)
+        llm._default_secret_store_name = "mock"
 
-    retrieved = llm.get_secret_store()
-    assert retrieved is store
+        retrieved = llm.get_secret_store()
+        assert retrieved is store
+    finally:
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._default_secret_store_name = orig_default
+        llm._secret_stores_loaded = orig_loaded
 
 
 def test_get_secret_stores_returns_all():
     """get_secret_stores returns all registered stores."""
-    llm._secret_stores.clear()
+    orig_stores = dict(llm._secret_stores)
+    orig_loaded = llm._secret_stores_loaded
+    try:
+        llm._secret_stores.clear()
+        llm._secret_stores_loaded = True  # Prevent reload
 
-    store1 = MockSecretStore()
-    store1.name = "store1"
-    store2 = MockSecretStore()
-    store2.name = "store2"
+        store1 = MockSecretStore()
+        store1.name = "store1"
+        store2 = MockSecretStore()
+        store2.name = "store2"
 
-    llm.register_secret_store(store1)
-    llm.register_secret_store(store2)
+        llm.register_secret_store(store1)
+        llm.register_secret_store(store2)
 
-    stores = llm.get_secret_stores()
-    assert len(stores) == 2
-    assert stores["store1"] is store1
-    assert stores["store2"] is store2
+        stores = llm.get_secret_stores()
+        assert len(stores) == 2
+        assert stores["store1"] is store1
+        assert stores["store2"] is store2
+    finally:
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._secret_stores_loaded = orig_loaded
 
 
 def test_set_default_secret_store():
     """Can set default secret store."""
-    llm._secret_stores.clear()
-    llm._default_secret_store_name = None
+    orig_stores = dict(llm._secret_stores)
+    orig_loaded = llm._secret_stores_loaded
+    orig_default = llm._default_secret_store_name
+    try:
+        llm._secret_stores.clear()
+        llm._default_secret_store_name = None
 
-    store = MockSecretStore()
-    llm.register_secret_store(store)
+        store = MockSecretStore()
+        llm.register_secret_store(store)
 
-    llm.set_default_secret_store("mock")
-    assert llm._default_secret_store_name == "mock"
+        llm.set_default_secret_store("mock")
+        assert llm._default_secret_store_name == "mock"
+    finally:
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._default_secret_store_name = orig_default
+        llm._secret_stores_loaded = orig_loaded
 
 
 def test_set_default_secret_store_must_exist():
     """set_default_secret_store raises error if store doesn't exist."""
-    llm._secret_stores.clear()
+    orig_stores = dict(llm._secret_stores)
+    orig_loaded = llm._secret_stores_loaded
+    try:
+        llm._secret_stores.clear()
 
-    with pytest.raises(ValueError, match="Secret store 'nonexistent' is not registered"):
-        llm.set_default_secret_store("nonexistent")
+        with pytest.raises(ValueError, match="Secret store 'nonexistent' is not registered"):
+            llm.set_default_secret_store("nonexistent")
+    finally:
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._secret_stores_loaded = orig_loaded

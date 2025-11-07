@@ -27,7 +27,10 @@ from llm import (
     get_embedding_models_with_aliases,
     get_embedding_model_aliases,
     get_embedding_model,
+    get_key,
     get_plugins,
+    get_secret_store,
+    get_secret_stores,
     get_tools,
     get_fragment_loaders,
     get_template_loaders,
@@ -1280,16 +1283,43 @@ def keys():
 
 
 @keys.command(name="list")
-def keys_list():
-    "List names of all stored keys"
-    path = user_dir() / "keys.json"
-    if not path.exists():
-        click.echo("No keys found")
-        return
-    keys = json.loads(path.read_text())
-    for key in sorted(keys.keys()):
-        if key != "// Note":
-            click.echo(key)
+@click.option(
+    "--store",
+    default=None,
+    help="Secret store to list (default: all stores)",
+)
+def keys_list(store):
+    """
+    List names of all stored keys
+    """
+    if store:
+        # List from specific store with store name
+        secret_store = get_secret_store(store)
+        if not secret_store:
+            raise click.ClickException(f"Secret store '{store}' not found")
+        keys = secret_store.list_keys()
+        for key in sorted(keys):
+            click.echo(f"{key} ({store})")
+    else:
+        # List from all stores
+        all_keys = set()
+        stores = get_secret_stores()
+        if not stores:
+            click.echo("No keys found")
+            return
+
+        # Backwards compatibility: if only one store, don't show store name
+        show_store_name = len(stores) > 1
+
+        for store_name, secret_store in stores.items():
+            store_keys = secret_store.list_keys()
+            for key in store_keys:
+                if key not in all_keys:
+                    if show_store_name:
+                        click.echo(f"{key} ({store_name})")
+                    else:
+                        click.echo(key)
+                    all_keys.add(key)
 
 
 @keys.command(name="path")
@@ -1300,7 +1330,12 @@ def keys_path_command():
 
 @keys.command(name="get")
 @click.argument("name")
-def keys_get(name):
+@click.option(
+    "--store",
+    default=None,
+    help="Secret store to use (default: search all stores)",
+)
+def keys_get(name, store):
     """
     Return the value of a stored key
 
@@ -1309,22 +1344,33 @@ def keys_get(name):
     \b
         export OPENAI_API_KEY=$(llm keys get openai)
     """
-    path = user_dir() / "keys.json"
-    if not path.exists():
-        raise click.ClickException("No keys found")
-    keys = json.loads(path.read_text())
-    try:
-        click.echo(keys[name])
-    except KeyError:
-        raise click.ClickException("No key found with name '{}'".format(name))
+    if store:
+        # Get from specific store
+        secret_store = get_secret_store(store)
+        if not secret_store:
+            raise click.ClickException(f"Secret store '{store}' not found")
+        value = secret_store.get(name)
+    else:
+        # Use get_key which searches in priority order
+        value = get_key(None, name)
+
+    if value:
+        click.echo(value)
+    else:
+        raise click.ClickException(f"Secret '{name}' not found")
 
 
 @keys.command(name="set")
 @click.argument("name")
 @click.option("--value", prompt="Enter key", hide_input=True, help="Value to set")
-def keys_set(name, value):
+@click.option(
+    "--store",
+    default=None,
+    help="Secret store to use (default: configured default store)",
+)
+def keys_set(name, value, store):
     """
-    Save a key in the keys.json file
+    Save a key in the secret store
 
     Example usage:
 
@@ -1332,18 +1378,25 @@ def keys_set(name, value):
         $ llm keys set openai
         Enter key: ...
     """
-    default = {"// Note": "This file stores secret API credentials. Do not share!"}
-    path = user_dir() / "keys.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.write_text(json.dumps(default))
-        path.chmod(0o600)
+    # Get the appropriate secret store
+    if store:
+        secret_store = get_secret_store(store)
+        if not secret_store:
+            available = ", ".join(get_secret_stores().keys())
+            raise click.ClickException(
+                f"Secret store '{store}' not found. "
+                f"Available stores: {available}"
+            )
+    else:
+        secret_store = get_secret_store()
+        if not secret_store:
+            raise click.ClickException("No secret store available")
+
     try:
-        current = json.loads(path.read_text())
-    except json.decoder.JSONDecodeError:
-        current = default
-    current[name] = value
-    path.write_text(json.dumps(current, indent=2) + "\n")
+        secret_store.set(name, value)
+        click.echo(f"Secret '{name}' stored in '{secret_store.name}' store", err=True)
+    except Exception as e:
+        raise click.ClickException(f"Failed to store secret: {e}")
 
 
 @cli.group(
