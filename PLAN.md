@@ -1470,6 +1470,435 @@ the configured secret store backend, providing flexibility and security.
 
 ---
 
+## Phase 13: CLI for Secret Store Configuration
+
+**Goal:** Add CLI commands to manage default secret store and configure store-specific options.
+
+**Rationale:** Users currently need to manually edit `secret-store-config.json` to set the default store or configure store options. This is error-prone and not user-friendly. We should provide CLI commands following the existing `llm models` pattern.
+
+**Design Choice:** Follow the `llm models default` and `llm models options` pattern
+
+The `llm models` command provides a good precedent:
+- `llm models` - list models (default command)
+- `llm models default` - show/set default model
+- `llm models options` - manage model options (show/set/clear)
+
+We will mirror this structure for secret stores:
+- `llm keys stores` - list stores (exists, will become default command)
+- `llm keys stores default` - show/set default store (new)
+- `llm keys stores options` - manage store options (new)
+
+### Proposed CLI Structure
+
+```bash
+# Existing (will remain as default)
+llm keys stores                                    # list all stores
+llm keys stores --verbose                          # list with details
+
+# New commands - default store management
+llm keys stores default                            # show current default store
+llm keys stores default <store-name>               # set default store
+
+# New commands - options management
+llm keys stores options                            # list options for all stores
+llm keys stores options show <store-name>          # show options for a store
+llm keys stores options set <store-name> <key> <value>  # set an option
+llm keys stores options clear <store-name>         # clear all options for a store
+```
+
+### Implementation Steps
+
+#### 13.1: Refactor `llm keys stores` Command Structure
+
+**Current state:** `keys_stores` is a simple command under `keys` group
+
+**Required changes:**
+- Convert `@keys.command(name="stores")` to `@keys.group(name="stores")`
+- Use `DefaultGroup` with `default="list"` to maintain backward compatibility
+- Rename current `keys_stores` function to `stores_list`
+- Keep `--verbose` option on `stores_list`
+
+**Code structure:**
+```python
+@keys.group(
+    name="stores",
+    cls=DefaultGroup,
+    default="list",
+    default_if_no_args=True
+)
+def stores():
+    """Manage secret stores"""
+    pass
+
+@stores.command(name="list")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def stores_list(verbose):
+    """List available secret stores"""
+    # Move current keys_stores implementation here
+    stores = get_secret_stores()
+    default_store_name = get_default_secret_store_name()
+    # ... rest of current implementation
+```
+
+**Files to modify:**
+- `llm/cli.py`
+
+**Testing:**
+- [ ] Test `llm keys stores` still works (backward compatibility)
+- [ ] Test `llm keys stores list` works explicitly
+- [ ] Test `llm keys stores --verbose` still works
+- [ ] Verify help text is correct
+
+**Success Criteria:**
+- Existing `llm keys stores` command works identically
+- New structure supports subcommands
+- No breaking changes
+
+#### 13.2: Implement `llm keys stores default` Command
+
+**Purpose:** Show and set the default secret store
+
+**Behavior:**
+- `llm keys stores default` - shows current default store name
+- `llm keys stores default <name>` - sets the default store
+
+**Implementation:**
+```python
+@stores.command(name="default")
+@click.argument("name", required=False)
+def stores_default(name):
+    """Show or set the default secret store
+
+    Example usage:
+
+    \b
+        # Show current default
+        llm keys stores default
+
+        # Set default store
+        llm keys stores default keychain
+    """
+    if name is None:
+        # Show current default
+        default_name = get_default_secret_store_name()
+        if default_name:
+            click.echo(default_name)
+        else:
+            click.echo("No default store set", err=True)
+    else:
+        # Set default
+        stores = get_secret_stores()
+        if name not in stores:
+            available = ", ".join(sorted(stores.keys()))
+            raise click.ClickException(
+                f"Store '{name}' not found. Available stores: {available}"
+            )
+
+        # Load config, update default, save
+        config = load_secret_store_config()
+        config["default_store"] = name
+        save_secret_store_config(config)
+        click.echo(f"Default store set to '{name}'", err=True)
+```
+
+**Files to modify:**
+- `llm/cli.py`
+
+**Testing:**
+- [ ] Test showing default store
+- [ ] Test setting default store
+- [ ] Test error when setting invalid store name
+- [ ] Test that config file is updated
+- [ ] Test that setting persists across invocations
+
+**Success Criteria:**
+- Can show current default store
+- Can set default store
+- Config file is updated correctly
+- Helpful error messages for invalid stores
+- At least 4 unit tests
+
+#### 13.3: Implement `llm keys stores options` Command Group
+
+**Purpose:** Manage configuration options for secret stores
+
+**Structure:** Following `llm models options` pattern with show/set/clear/list
+
+**Implementation:**
+```python
+@stores.group(
+    cls=DefaultGroup,
+    default="list",
+    default_if_no_args=True
+)
+def options():
+    """Manage secret store configuration options"""
+    pass
+
+@options.command(name="list")
+def options_list():
+    """List configuration options for all stores
+
+    Example usage:
+
+    \b
+        llm keys stores options list
+    """
+    config = load_secret_store_config()
+    store_configs = config.get("stores", {})
+
+    if not store_configs:
+        click.echo("No store options configured", err=True)
+        return
+
+    for store_name in sorted(store_configs.keys()):
+        click.echo(f"{store_name}:")
+        options = store_configs[store_name]
+        for key, value in sorted(options.items()):
+            click.echo(f"  {key}: {value}")
+
+@options.command(name="show")
+@click.argument("store")
+def options_show(store):
+    """Show configuration options for a specific store
+
+    Example usage:
+
+    \b
+        llm keys stores options show keychain
+    """
+    # Validate store exists
+    stores = get_secret_stores()
+    if store not in stores:
+        available = ", ".join(sorted(stores.keys()))
+        raise click.ClickException(
+            f"Store '{store}' not found. Available stores: {available}"
+        )
+
+    config = load_secret_store_config()
+    store_options = config.get("stores", {}).get(store, {})
+
+    if not store_options:
+        click.echo(f"No options configured for store '{store}'", err=True)
+        return
+
+    for key, value in sorted(store_options.items()):
+        click.echo(f"{key}: {value}")
+
+@options.command(name="set")
+@click.argument("store")
+@click.argument("key")
+@click.argument("value")
+def options_set(store, key, value):
+    """Set a configuration option for a store
+
+    Example usage:
+
+    \b
+        llm keys stores options set keychain service_name my-llm
+        llm keys stores options set vault url https://vault.example.com
+    """
+    # Validate store exists
+    stores = get_secret_stores()
+    if store not in stores:
+        available = ", ".join(sorted(stores.keys()))
+        raise click.ClickException(
+            f"Store '{store}' not found. Available stores: {available}"
+        )
+
+    # Load config, update option, save
+    config = load_secret_store_config()
+    if "stores" not in config:
+        config["stores"] = {}
+    if store not in config["stores"]:
+        config["stores"][store] = {}
+
+    config["stores"][store][key] = value
+    save_secret_store_config(config)
+
+    click.echo(f"Set {key}={value} for store '{store}'", err=True)
+
+@options.command(name="clear")
+@click.argument("store")
+@click.option(
+    "--key",
+    help="Clear only this specific key (if not specified, clears all options)"
+)
+def options_clear(store, key):
+    """Clear configuration options for a store
+
+    Example usage:
+
+    \b
+        # Clear all options for a store
+        llm keys stores options clear keychain
+
+        # Clear specific option
+        llm keys stores options clear keychain --key service_name
+    """
+    # Validate store exists
+    stores = get_secret_stores()
+    if store not in stores:
+        available = ", ".join(sorted(stores.keys()))
+        raise click.ClickException(
+            f"Store '{store}' not found. Available stores: {available}"
+        )
+
+    config = load_secret_store_config()
+    store_configs = config.get("stores", {})
+
+    if store not in store_configs:
+        click.echo(f"No options configured for store '{store}'", err=True)
+        return
+
+    if key:
+        # Clear specific key
+        if key in store_configs[store]:
+            del store_configs[store][key]
+            save_secret_store_config(config)
+            click.echo(f"Cleared {key} for store '{store}'", err=True)
+        else:
+            click.echo(f"Option '{key}' not set for store '{store}'", err=True)
+    else:
+        # Clear all options
+        del config["stores"][store]
+        save_secret_store_config(config)
+        click.echo(f"Cleared all options for store '{store}'", err=True)
+```
+
+**Files to modify:**
+- `llm/cli.py`
+
+**Testing:**
+- [ ] Test `llm keys stores options` (list all)
+- [ ] Test `llm keys stores options list` (explicit)
+- [ ] Test `llm keys stores options show <store>`
+- [ ] Test `llm keys stores options set <store> <key> <value>`
+- [ ] Test `llm keys stores options clear <store>`
+- [ ] Test `llm keys stores options clear <store> --key <key>`
+- [ ] Test error handling for invalid store names
+- [ ] Test that options persist in config file
+- [ ] Test empty/no options scenarios
+
+**Success Criteria:**
+- All subcommands work correctly
+- Config file is properly updated
+- Helpful error messages
+- At least 8 unit tests covering all commands
+
+#### 13.4: Add Tests
+
+Create comprehensive tests in `tests/test_keys.py`:
+
+**Test scenarios:**
+- [ ] `test_keys_stores_default_show` - show default store
+- [ ] `test_keys_stores_default_set` - set default store
+- [ ] `test_keys_stores_default_set_invalid` - error on invalid store
+- [ ] `test_keys_stores_options_list_empty` - no options configured
+- [ ] `test_keys_stores_options_list` - list all configured options
+- [ ] `test_keys_stores_options_show` - show options for specific store
+- [ ] `test_keys_stores_options_show_empty` - no options for store
+- [ ] `test_keys_stores_options_set` - set an option
+- [ ] `test_keys_stores_options_set_multiple` - set multiple options
+- [ ] `test_keys_stores_options_clear_all` - clear all options for store
+- [ ] `test_keys_stores_options_clear_key` - clear specific option
+- [ ] `test_keys_stores_backward_compatibility` - ensure `llm keys stores` still works
+
+**Success Criteria:**
+- All new tests pass
+- Existing tests still pass
+- Config file changes are tested
+- Total test count increases to ~125 tests
+
+#### 13.5: Run Tests and Format
+
+- [ ] Run `pytest tests/test_llm.py tests/test_keys.py -v`
+- [ ] Run `black llm/cli.py tests/test_keys.py`
+- [ ] Verify all tests pass after formatting
+
+**Success Criteria:**
+- All tests pass
+- Code is formatted with black
+
+#### 13.6: Update Documentation
+
+**Files to update:**
+
+**docs/setup.md:**
+- [ ] Add section about `llm keys stores default` command
+- [ ] Add section about `llm keys stores options` commands
+- [ ] Update existing examples to show CLI-based configuration
+- [ ] Keep manual `secret-store-config.json` editing as alternative
+
+**docs/changelog.md:**
+- [ ] Add entries for new commands to [Unreleased] section
+
+**Example additions for docs/setup.md:**
+```markdown
+#### Setting the default store via CLI
+
+Instead of editing `secret-store-config.json` manually, you can use the CLI:
+
+```bash
+# Show current default store
+llm keys stores default
+
+# Set a different default store
+llm keys stores default keychain
+```
+
+#### Configuring store options via CLI
+
+You can configure options for secret stores using the CLI:
+
+```bash
+# Show all configured options
+llm keys stores options
+
+# Show options for a specific store
+llm keys stores options show keychain
+
+# Set an option
+llm keys stores options set keychain service_name my-llm-keys
+
+# Clear all options for a store
+llm keys stores options clear keychain
+
+# Clear a specific option
+llm keys stores options clear keychain --key service_name
+```
+```
+
+**Success Criteria:**
+- Documentation is clear and accurate
+- Examples are tested and work
+- Follows existing documentation style
+
+#### 13.7: Commit and Push
+
+- [ ] Commit all changes with descriptive message
+- [ ] Update PLAN.md with completion status
+- [ ] Push to branch
+
+**Success Criteria:**
+- All changes committed and pushed
+- PLAN.md updated
+
+### Success Criteria for Phase 13
+
+- [ ] `llm keys stores` command still works (backward compatibility)
+- [ ] `llm keys stores default` shows and sets default store
+- [ ] `llm keys stores options` commands manage store configuration
+- [ ] Config file (`secret-store-config.json`) is properly updated
+- [ ] All new commands have comprehensive help text
+- [ ] At least 12 new tests added
+- [ ] All tests pass (125+ total)
+- [ ] Documentation updated
+- [ ] Code formatted with black
+- [ ] No breaking changes
+
+---
+
 ## Final Success Criteria Checklist
 
 ✅ **IMPLEMENTATION COMPLETE - ALL CORE CRITERIA MET**
