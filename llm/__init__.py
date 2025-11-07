@@ -355,8 +355,14 @@ def get_key(
     input: Optional[str] = None,
 ) -> Optional[str]:
     """
-    Return an API key based on a hierarchy of potential sources. You should use the keyword arguments,
-    the positional arguments are here purely for backwards-compatibility with older code.
+    Return an API key based on a hierarchy of potential sources.
+
+    Priority order:
+    1. Explicit key parameter
+    2. Secret store (configured backend)
+    3. Legacy keys.json file (for backward compatibility)
+    4. Environment variable
+    5. None
 
     :param input: Input provided by the user. This may be the key, or an alias of a key in keys.json.
     :param alias: The alias used to retrieve the key from the keys.json file.
@@ -368,20 +374,44 @@ def get_key(
         env_var = env
     if input:
         explicit_key = input
-    stored_keys = load_keys()
-    # If user specified an alias, use the key stored for that alias
-    if explicit_key in stored_keys:
-        return stored_keys[explicit_key]
+
+    # 1. Explicit key takes highest priority
+    # First check if it's an alias in any storage system
     if explicit_key:
-        # User specified a key that's not an alias, use that
+        # Try secret store first
+        secret_store = get_secret_store()
+        if secret_store:
+            stored_value = secret_store.get(explicit_key)
+            if stored_value:
+                return stored_value
+
+        # Try legacy keys.json
+        stored_keys = load_keys()
+        if explicit_key in stored_keys:
+            return stored_keys[explicit_key]
+
+        # Not an alias, use as literal key
         return explicit_key
-    # Stored key over-rides environment variables over-ride the default key
-    if key_alias in stored_keys:
-        return stored_keys[key_alias]
-    # Finally try environment variable
+
+    # 2. Try looking up key_alias if provided
+    if key_alias:
+        # Try secret store
+        secret_store = get_secret_store()
+        if secret_store:
+            stored_value = secret_store.get(key_alias)
+            if stored_value:
+                return stored_value
+
+        # Try legacy keys.json
+        stored_keys = load_keys()
+        if key_alias in stored_keys:
+            return stored_keys[key_alias]
+
+    # 3. Try environment variable
     if env_var and os.environ.get(env_var):
         return os.environ[env_var]
-    # Couldn't find it
+
+    # 4. Couldn't find it
     return None
 
 

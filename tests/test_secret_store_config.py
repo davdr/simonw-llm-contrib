@@ -101,90 +101,126 @@ def test_save_secret_store_config_permissions(monkeypatch, tmpdir):
 @pytest.mark.xfail(sys.platform == "win32", reason="Expected to fail on Windows")
 def test_configuration_applied_to_stores(monkeypatch, tmpdir):
     """Configuration is applied to stores during initialization."""
-    monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
+    # Save original state
+    orig_loaded = llm._secret_stores_loaded
+    orig_stores = dict(llm._secret_stores)
+    orig_default = llm._default_secret_store_name
 
-    # Create a config file
-    config_path = Path(tmpdir) / "secret-store-config.json"
-    config_data = {
-        "default_store": "json",
-        "stores": {
-            "json": {"test_setting": "test_value"}
+    try:
+        monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
+
+        # Create a config file
+        config_path = Path(tmpdir) / "secret-store-config.json"
+        config_data = {
+            "default_store": "json",
+            "stores": {
+                "json": {"test_setting": "test_value"}
+            }
         }
-    }
-    config_path.write_text(json.dumps(config_data))
+        config_path.write_text(json.dumps(config_data))
 
-    # Clear loaded state to force reload
-    llm._secret_stores_loaded = False
-    llm._secret_stores.clear()
-    llm._default_secret_store_name = None
+        # Clear loaded state to force reload
+        llm._secret_stores_loaded = False
+        llm._secret_stores.clear()
+        llm._default_secret_store_name = None
 
-    # Get store which triggers loading
-    store = llm.get_secret_store("json")
-    assert store is not None
-    # Note: JsonSecretStore doesn't store config, but configure() was called
+        # Get store which triggers loading
+        store = llm.get_secret_store("json")
+        assert store is not None
+        # Note: JsonSecretStore doesn't store config, but configure() was called
+    finally:
+        # Restore original state
+        llm._secret_stores_loaded = orig_loaded
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._default_secret_store_name = orig_default
 
 
 @pytest.mark.xfail(sys.platform == "win32", reason="Expected to fail on Windows")
 def test_default_store_from_config(monkeypatch, tmpdir):
     """Default store is set from configuration."""
-    monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
+    # Save original state
+    orig_loaded = llm._secret_stores_loaded
+    orig_stores = dict(llm._secret_stores)
+    orig_default = llm._default_secret_store_name
 
-    # Register a mock store
-    class MockStore(llm.SecretStore):
-        name = "mock"
+    try:
+        monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
 
-        def get(self, key_alias: str):
-            return None
+        # Register a mock store
+        class MockStore(llm.SecretStore):
+            name = "mock"
 
-        def set(self, key_alias: str, value: str):
-            pass
+            def get(self, key_alias: str):
+                return None
 
-        def delete(self, key_alias: str):
-            return False
+            def set(self, key_alias: str, value: str):
+                pass
 
-        def list_keys(self):
-            return []
+            def delete(self, key_alias: str):
+                return False
 
-    # Clear and reload
-    llm._secret_stores_loaded = False
-    llm._secret_stores.clear()
-    llm._default_secret_store_name = None
+            def list_keys(self):
+                return []
 
-    # Register mock store manually
-    llm.register_secret_store(MockStore())
+        # Clear and reload
+        llm._secret_stores_loaded = False
+        llm._secret_stores.clear()
+        llm._default_secret_store_name = None
 
-    # Create config with mock as default
-    config_path = Path(tmpdir) / "secret-store-config.json"
-    config_data = {"default_store": "mock", "stores": {}}
-    config_path.write_text(json.dumps(config_data))
+        # Register mock store manually
+        llm.register_secret_store(MockStore())
 
-    # Reload
-    llm._secret_stores_loaded = False
-    llm._load_secret_stores()
+        # Create config with mock as default
+        config_path = Path(tmpdir) / "secret-store-config.json"
+        config_data = {"default_store": "mock", "stores": {}}
+        config_path.write_text(json.dumps(config_data))
 
-    # Check default
-    default_store = llm.get_secret_store()
-    assert default_store.name == "mock"
+        # Reload
+        llm._secret_stores_loaded = False
+        llm._load_secret_stores()
+
+        # Check default
+        default_store = llm.get_secret_store()
+        assert default_store.name == "mock"
+    finally:
+        # Restore original state
+        llm._secret_stores_loaded = orig_loaded
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._default_secret_store_name = orig_default
 
 
 @pytest.mark.xfail(sys.platform == "win32", reason="Expected to fail on Windows")
 def test_fallback_to_json_when_default_missing(monkeypatch, tmpdir):
     """Falls back to json when configured default doesn't exist."""
-    monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
+    # Save original state
+    orig_loaded = llm._secret_stores_loaded
+    orig_stores = dict(llm._secret_stores)
+    orig_default = llm._default_secret_store_name
 
-    # Create config with nonexistent default
-    config_path = Path(tmpdir) / "secret-store-config.json"
-    config_data = {"default_store": "nonexistent", "stores": {}}
-    config_path.write_text(json.dumps(config_data))
+    try:
+        monkeypatch.setenv("LLM_USER_PATH", str(tmpdir))
 
-    # Clear and reload
-    llm._secret_stores_loaded = False
-    llm._secret_stores.clear()
-    llm._default_secret_store_name = None
+        # Create config with nonexistent default
+        config_path = Path(tmpdir) / "secret-store-config.json"
+        config_data = {"default_store": "nonexistent", "stores": {}}
+        config_path.write_text(json.dumps(config_data))
 
-    # Get store which triggers loading
-    llm._load_secret_stores()
+        # Clear and reload
+        llm._secret_stores_loaded = False
+        llm._secret_stores.clear()
+        llm._default_secret_store_name = None
 
-    # Should fall back to json
-    default_store = llm.get_secret_store()
-    assert default_store.name == "json"
+        # Get store which triggers loading
+        llm._load_secret_stores()
+
+        # Should fall back to json
+        default_store = llm.get_secret_store()
+        assert default_store.name == "json"
+    finally:
+        # Restore original state
+        llm._secret_stores_loaded = orig_loaded
+        llm._secret_stores.clear()
+        llm._secret_stores.update(orig_stores)
+        llm._default_secret_store_name = orig_default

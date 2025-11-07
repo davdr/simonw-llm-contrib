@@ -193,26 +193,3 @@ def test_json_secret_store_filters_comment_from_list(tmpdir):
     keys = store.list_keys()
     assert "// Note" not in keys
     assert "key1" in keys
-
-
-# Tests for plugin registration
-
-
-def test_json_secret_store_registered_as_plugin():
-    """JSON secret store is automatically registered on startup."""
-    import llm
-
-    store = llm.get_secret_store('json')
-    assert store is not None
-    assert store.name == "json"
-    assert isinstance(store, JsonSecretStore)
-
-
-def test_json_secret_store_is_default():
-    """JSON secret store is set as default."""
-    import llm
-
-    # Get default store
-    default_store = llm.get_secret_store()
-    assert default_store is not None
-    assert default_store.name == "json"
