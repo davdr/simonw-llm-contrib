@@ -1144,6 +1144,107 @@ Perform manual testing:
 
 ---
 
+## Phase 11: Store Discovery Feature
+
+**Goal:** Add `llm keys stores` command to allow users to discover available secret stores.
+
+**Rationale:** Users need a way to know which values they can pass to the `--store` option in keys commands. Without this, the feature is not discoverable.
+
+**Design Choice:** Implement `llm keys stores` subcommand (Option 1 from design discussion)
+
+**Why this approach:**
+1. Follows existing CLI patterns (like `llm models list` shows available models)
+2. Highly discoverable - users exploring `llm keys --help` will see the `stores` command
+3. Extensible - can add flags like `--verbose` or `--json` later
+4. Clear separation of concerns - keys vs stores are different entities
+5. Natural place to indicate which store is the default
+
+**Alternative approaches considered:**
+- Option 2: Dynamic Click.Choice with validation - less discoverable
+- Option 3: Extend `llm keys path` or add `llm keys info` - mixes concerns
+
+### Steps
+
+#### 11.1: Implement `llm keys stores` Command
+- [ ] Add `keys_stores()` function to `llm/cli.py`
+- [ ] Implement basic listing showing store names
+- [ ] Mark default store with "(default)" suffix
+- [ ] Add `--verbose` flag for detailed information (optional)
+
+**Implementation details:**
+```python
+@keys.command(name="stores")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def keys_stores(verbose):
+    """List available secret stores"""
+    _load_secret_stores()  # Ensure stores are loaded
+    stores = get_secret_stores()
+    default_store_name = llm._default_secret_store_name
+
+    if not stores:
+        click.echo("No secret stores available", err=True)
+        return
+
+    for store_name, store in sorted(stores.items()):
+        is_default = " (default)" if store_name == default_store_name else ""
+        click.echo(f"{store_name}{is_default}")
+
+        if verbose:
+            keys_count = len(store.list_keys())
+            click.echo(f"  Keys stored: {keys_count}")
+```
+
+**Files to modify:**
+- `llm/cli.py`
+
+**Testing:**
+- [ ] Test `llm keys stores` shows available stores
+- [ ] Test default store is marked with "(default)"
+- [ ] Test with no stores registered (edge case)
+- [ ] Test `--verbose` flag shows additional details
+- [ ] Test store ordering (alphabetical)
+
+**Success Criteria:**
+- Command works and lists all registered stores
+- Default store is clearly indicated
+- Help text is clear and consistent with other commands
+- At least 3 unit tests covering basic functionality
+
+#### 11.2: Add Tests
+Create tests in `tests/test_keys.py` or new `tests/test_keys_stores_command.py`:
+
+- [ ] Test basic store listing
+- [ ] Test default store indication
+- [ ] Test verbose output
+- [ ] Test empty stores list
+- [ ] Test multiple stores scenario
+
+**Success Criteria:**
+- All new tests pass
+- Existing tests still pass
+- Total test count increases appropriately
+
+#### 11.3: Run Tests and Format
+- [ ] Run `pytest tests/test_llm.py tests/test_keys.py -v` to verify no regressions
+- [ ] Run `black llm/cli.py tests/` to format new code
+- [ ] Verify all tests still pass after formatting
+
+**Success Criteria:**
+- All tests pass (110+ tests)
+- Code is properly formatted
+- No regressions introduced
+
+#### 11.4: Commit and Push
+- [ ] Commit changes with descriptive message
+- [ ] Update this PLAN.md with completion status
+- [ ] Push to branch
+
+**Success Criteria:**
+- Changes committed and pushed successfully
+- PLAN.md updated to track completion
+
+---
+
 ## Final Success Criteria Checklist
 
 ✅ **IMPLEMENTATION COMPLETE - ALL CORE CRITERIA MET**
