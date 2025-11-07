@@ -447,6 +447,60 @@ def set_default_secret_store(name: str):
     _default_secret_store_name = name
 
 
+def load_secret_store_config() -> Dict[str, Any]:
+    """
+    Load secret store configuration from secret-store-config.json.
+
+    Returns:
+        Configuration dictionary with:
+        - default_store: Name of default secret store
+        - stores: Dict of store-specific configurations
+    """
+    config_path = user_dir() / "secret-store-config.json"
+
+    if not config_path.exists():
+        return {
+            "default_store": "json",
+            "stores": {}
+        }
+
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+        # Validate basic structure
+        if not isinstance(config, dict):
+            raise ValueError("Configuration must be a JSON object")
+
+        # Provide defaults
+        config.setdefault("default_store", "json")
+        config.setdefault("stores", {})
+
+        return config
+    except (json.JSONDecodeError, IOError, ValueError):
+        # Log error but continue with defaults
+        # Return defaults on any error
+        return {
+            "default_store": "json",
+            "stores": {}
+        }
+
+
+def save_secret_store_config(config: Dict[str, Any]) -> None:
+    """Save secret store configuration."""
+    config_path = user_dir() / "secret-store-config.json"
+
+    # Ensure directory exists
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=2)
+        f.write('\n')
+
+    # Secure permissions
+    config_path.chmod(0o600)
+
+
 _secret_stores_loaded = False
 
 
@@ -464,8 +518,21 @@ def _load_secret_stores():
     # Call the hook to register stores
     pm.hook.register_secret_stores(register=register_secret_store)
 
-    # Set JSON as default if no default set
-    if _default_secret_store_name is None and 'json' in _secret_stores:
+    # Load configuration
+    config = load_secret_store_config()
+
+    # Configure each store
+    for store_name, store_config in config.get("stores", {}).items():
+        store = _secret_stores.get(store_name)
+        if store:
+            store.configure(store_config)
+
+    # Set default store from config
+    default_store = config.get("default_store", "json")
+    if default_store in _secret_stores:
+        _default_secret_store_name = default_store
+    elif 'json' in _secret_stores:
+        # Fallback to json if configured default doesn't exist
         _default_secret_store_name = 'json'
 
 
