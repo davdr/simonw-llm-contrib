@@ -24,6 +24,7 @@ from llm import (
     get_async_model,
     get_default_model,
     get_default_embedding_model,
+    get_default_secret_store_name,
     get_embedding_models_with_aliases,
     get_embedding_model_aliases,
     get_embedding_model,
@@ -1396,6 +1397,26 @@ def keys_set(name, value, store):
         click.echo(f"Secret '{name}' stored in '{secret_store.name}' store", err=True)
     except Exception as e:
         raise click.ClickException(f"Failed to store secret: {e}")
+
+
+@keys.command(name="stores")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def keys_stores(verbose):
+    """List available secret stores"""
+    stores = get_secret_stores()
+    default_store_name = get_default_secret_store_name()
+
+    if not stores:
+        click.echo("No secret stores available", err=True)
+        return
+
+    for store_name, store in sorted(stores.items()):
+        is_default = " (default)" if store_name == default_store_name else ""
+        click.echo(f"{store_name}{is_default}")
+
+        if verbose:
+            keys_count = len(store.list_keys())
+            click.echo(f"  Keys stored: {keys_count}")
 
 
 @cli.group(

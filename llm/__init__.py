@@ -477,6 +477,12 @@ def set_default_secret_store(name: str):
     _default_secret_store_name = name
 
 
+def get_default_secret_store_name() -> Optional[str]:
+    """Get the name of the default secret store."""
+    _load_secret_stores()
+    return _default_secret_store_name
+
+
 def load_secret_store_config() -> Dict[str, Any]:
     """
     Load secret store configuration from secret-store-config.json.

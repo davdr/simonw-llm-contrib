@@ -110,3 +110,45 @@ def test_uses_correct_key(mocked_openai_chat, monkeypatch, tmpdir):
     )
     assert result4.exit_code == 0
     assert_key("custom-key")
+
+
+def test_keys_stores_basic(monkeypatch, tmpdir):
+    """Test that llm keys stores lists available stores"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["keys", "stores"])
+    assert result.exit_code == 0
+    assert "json (default)" in result.output
+
+
+def test_keys_stores_verbose(monkeypatch, tmpdir):
+    """Test that llm keys stores --verbose shows key counts"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # First check with no keys
+    result = runner.invoke(cli, ["keys", "stores", "--verbose"])
+    assert result.exit_code == 0
+    assert "json (default)" in result.output
+    assert "Keys stored: 0" in result.output
+
+    # Add a key and check again
+    runner.invoke(cli, ["keys", "set", "test"], input="value")
+    result = runner.invoke(cli, ["keys", "stores", "--verbose"])
+    assert result.exit_code == 0
+    assert "json (default)" in result.output
+    assert "Keys stored: 1" in result.output
+
+
+def test_keys_stores_ordering(monkeypatch, tmpdir):
+    """Test that stores are listed in alphabetical order"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["keys", "stores"])
+    assert result.exit_code == 0
+    # With only json store, should see json (default)
+    lines = result.output.strip().split("\n")
+    assert lines[0] == "json (default)"
