@@ -427,6 +427,7 @@ def get_secret_store(name: Optional[str] = None):
     Returns:
         SecretStore instance, or None if not found
     """
+    _load_secret_stores()
     if name is None:
         name = _default_secret_store_name
     return _secret_stores.get(name)
@@ -434,6 +435,7 @@ def get_secret_store(name: Optional[str] = None):
 
 def get_secret_stores():
     """Get all registered secret stores."""
+    _load_secret_stores()
     return dict(_secret_stores)
 
 
@@ -443,6 +445,28 @@ def set_default_secret_store(name: str):
     if name not in _secret_stores:
         raise ValueError(f"Secret store '{name}' is not registered")
     _default_secret_store_name = name
+
+
+_secret_stores_loaded = False
+
+
+def _load_secret_stores():
+    """Load and register secret stores from plugins."""
+    global _secret_stores_loaded, _default_secret_store_name
+
+    if _secret_stores_loaded:
+        return
+    _secret_stores_loaded = True
+
+    # Make sure plugins are loaded
+    load_plugins()
+
+    # Call the hook to register stores
+    pm.hook.register_secret_stores(register=register_secret_store)
+
+    # Set JSON as default if no default set
+    if _default_secret_store_name is None and 'json' in _secret_stores:
+        _default_secret_store_name = 'json'
 
 
 def set_alias(alias, model_id_or_alias):
