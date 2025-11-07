@@ -1244,6 +1244,192 @@ Created tests in `tests/test_keys.py`:
 
 ---
 
+## Phase 12: Documentation Updates
+
+**Goal:** Update user and developer documentation to describe the secret store plugin system.
+
+**Rationale:** While the code has comprehensive inline documentation, the user-facing docs need updates to explain the new functionality, and the plugin developer docs need to document the new hook.
+
+### Files Requiring Updates
+
+Based on exploration of the `docs/` directory, the following files need updates:
+
+#### 12.1: docs/setup.md - API Key Management Section
+**Location:** Lines 95-162 (API key management section)
+
+**Updates needed:**
+- [ ] Explain that keys are now stored via a plugin-based secret store system
+- [ ] Document the `llm keys stores` command for discovering available stores
+- [ ] Document the `--store` option for keys commands (set, get, list)
+- [ ] Mention `secret-store-config.json` configuration file
+- [ ] Explain default behavior (JSON store, backward compatible)
+- [ ] Add note about future secure stores (OS keychain, etc.)
+- [ ] Update priority hierarchy documentation to include secret stores
+- [ ] Keep existing examples working (backward compatibility emphasis)
+
+**Example addition:**
+```markdown
+### Secret Store Backends
+
+LLM uses a plugin-based system for storing API keys. By default, keys are stored
+in a JSON file (maintaining backward compatibility), but plugins can provide
+more secure storage options like OS keychains or enterprise secret vaults.
+
+To see available secret stores:
+```bash
+llm keys stores
+```
+
+To use a specific store when setting a key:
+```bash
+llm keys set openai --store keychain
+```
+```
+
+#### 12.2: docs/plugins/plugin-hooks.md - Add register_secret_stores Hook
+**Location:** After existing hooks (around line 286)
+
+**Updates needed:**
+- [ ] Add complete documentation for the `register_secret_stores(register)` hook
+- [ ] Include example implementation of a simple secret store
+- [ ] Explain the `SecretStore` abstract base class
+- [ ] Document all required methods (get, set, delete, list_keys)
+- [ ] Document optional configure() method
+- [ ] Show how to register a store
+- [ ] Link to `SecretStore` API documentation
+
+**Example section:**
+```markdown
+## register_secret_stores(register)
+
+This hook allows plugins to register custom secret store backends for API key storage.
+
+Secret stores implement the `llm.SecretStore` abstract base class and provide
+secure storage for API keys and other credentials.
+
+Example implementation:
+
+```python
+import llm
+
+class KeychainSecretStore(llm.SecretStore):
+    name = "keychain"
+
+    def get(self, key_alias: str) -> Optional[str]:
+        # Retrieve from OS keychain
+        ...
+
+    def set(self, key_alias: str, value: str) -> None:
+        # Store in OS keychain
+        ...
+
+    def delete(self, key_alias: str) -> bool:
+        # Delete from OS keychain
+        ...
+
+    def list_keys(self) -> List[str]:
+        # List stored keys
+        ...
+
+@llm.hookimpl
+def register_secret_stores(register):
+    register(KeychainSecretStore())
+```
+```
+
+#### 12.3: docs/changelog.md - Add Entry for This Release
+**Location:** Top of file (new version section)
+
+**Updates needed:**
+- [ ] Add new version section at top of changelog
+- [ ] Document the secret store plugin system
+- [ ] List all new features and CLI commands
+- [ ] Emphasize backward compatibility
+- [ ] List new plugin hook
+- [ ] Note file additions
+
+**Example entry:**
+```markdown
+## [Unreleased]
+
+### New features
+
+- **Secret store plugin system** for flexible API key storage. Keys can now be stored
+  using pluggable backends. The existing JSON file storage is now implemented as the
+  default plugin, maintaining full backward compatibility. [#XXX](...)
+- New `register_secret_stores` plugin hook allows plugins to provide custom storage
+  backends such as OS keychains, password managers, or enterprise secret vaults.
+- New `llm keys stores` command to list available secret store backends.
+- Added `--store` option to `llm keys set`, `llm keys get`, and `llm keys list`
+  commands to specify which store to use.
+- New `secret-store-config.json` configuration file for setting default stores and
+  store-specific configuration.
+- New `llm.get_secret_store()`, `llm.get_secret_stores()`, and
+  `llm.get_default_secret_store_name()` functions for plugin developers.
+
+### Files added
+
+- `llm/secret_stores.py` - `SecretStore` abstract base class
+- `llm/default_plugins/json_secret_store.py` - JSON storage plugin (default)
+```
+
+#### 12.4: docs/plugins/plugin-utilities.md - Update get_key() Documentation
+**Location:** Lines 6-28 (llm.get_key() section)
+
+**Updates needed:**
+- [ ] Add note explaining get_key() now uses the secret store system
+- [ ] Explain the priority order includes secret stores
+- [ ] Mention that the functionality is transparent to plugin developers
+- [ ] Note about backward compatibility
+
+**Example addition:**
+```markdown
+### How it works
+
+Starting in version X.X.X, `llm.get_key()` uses the secret store plugin system.
+The priority order is:
+
+1. The `input` parameter if provided
+2. Secret store (default or configured store)
+3. Legacy `keys.json` file (for backward compatibility)
+4. Environment variable specified by `env` parameter
+5. `None`
+
+This means keys stored via `llm keys set` are automatically retrieved through
+the configured secret store backend, providing flexibility and security.
+```
+
+#### 12.5: docs/python-api.md - Document SecretStore Class (Optional)
+**Location:** Appropriate section in the API documentation
+
+**Updates needed:**
+- [ ] Add section documenting the `llm.SecretStore` abstract base class
+- [ ] Document all abstract methods
+- [ ] Document the optional configure() method
+- [ ] Show example implementation
+- [ ] Cross-reference with plugin-hooks.md
+
+**Note:** This may be optional if the plugin-hooks.md documentation is sufficient.
+
+### Success Criteria
+
+- [ ] All documentation files updated
+- [ ] Examples provided are clear and accurate
+- [ ] Cross-references between documents work correctly
+- [ ] Documentation accurately reflects implemented functionality
+- [ ] Backward compatibility emphasized throughout
+- [ ] Security considerations mentioned where appropriate
+
+### Testing Documentation
+
+After updates:
+- [ ] Build documentation locally to check for errors
+- [ ] Verify all code examples are syntactically correct
+- [ ] Check all internal links work
+- [ ] Ensure consistent terminology throughout
+
+---
+
 ## Final Success Criteria Checklist
 
 ✅ **IMPLEMENTATION COMPLETE - ALL CORE CRITERIA MET**
