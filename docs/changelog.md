@@ -10,10 +10,17 @@ This new system enables plugins to provide alternative storage backends includin
 
 - New {ref}`register_secret_stores <plugin-hooks-register-secret-stores>` plugin hook allows plugins to register custom storage backends for API keys and other secrets.
 - New `llm keys stores` command lists available secret store backends. Add `--verbose` to see key counts per store.
+- New `llm keys stores default` command to show or set the default secret store.
+- New `llm keys stores options` commands to manage store configuration:
+  - `llm keys stores options` - list all configured options
+  - `llm keys stores options show <store>` - show options for a specific store
+  - `llm keys stores options set <store> <key> <value>` - set a configuration option
+  - `llm keys stores options clear <store>` - clear all options for a store
+  - `llm keys stores options clear <store> --key <key>` - clear a specific option
 - Added `--store` option to `llm keys set`, `llm keys get`, and `llm keys list` commands to specify which store to use.
-- New `secret-store-config.json` configuration file for setting the default store and store-specific configuration options.
+- New `secret-store-config.json` configuration file for setting the default store and store-specific configuration options (can also be managed via CLI).
 - New `llm.SecretStore` abstract base class defining the interface for secret store plugins.
-- New functions for plugin developers: `llm.get_secret_store()`, `llm.get_secret_stores()`, `llm.get_default_secret_store_name()`, `llm.register_secret_store()`, and `llm.set_default_secret_store()`.
+- New functions for plugin developers: `llm.get_secret_store()`, `llm.get_secret_stores()`, `llm.get_default_secret_store_name()`, `llm.register_secret_store()`, `llm.set_default_secret_store()`, `llm.load_secret_store_config()`, and `llm.save_secret_store_config()`.
 - The existing `llm.get_key()` function now uses the secret store system transparently, with an updated priority hierarchy.
 - Updated key resolution priority: explicit `--key` parameter, secret store, environment variable.
 

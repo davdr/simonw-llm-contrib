@@ -152,3 +152,176 @@ def test_keys_stores_ordering(monkeypatch, tmpdir):
     # With only json store, should see json (default)
     lines = result.output.strip().split("\n")
     assert lines[0] == "json (default)"
+
+
+def test_keys_stores_default_show(monkeypatch, tmpdir):
+    """Test showing the default store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["keys", "stores", "default"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "json"
+
+
+def test_keys_stores_default_set(monkeypatch, tmpdir):
+    """Test setting the default store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["keys", "stores", "default", "json"])
+    assert result.exit_code == 0
+    assert "Default store set to 'json'" in result.output
+
+    # Verify it persists
+    result2 = runner.invoke(cli, ["keys", "stores", "default"])
+    assert result2.exit_code == 0
+    assert result2.output.strip() == "json"
+
+
+def test_keys_stores_default_set_invalid(monkeypatch, tmpdir):
+    """Test error when setting invalid store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["keys", "stores", "default", "invalid"])
+    assert result.exit_code != 0
+    assert "Store 'invalid' not found" in result.output
+    assert "Available stores: json" in result.output
+
+
+def test_keys_stores_options_list_empty(monkeypatch, tmpdir):
+    """Test listing options when none configured"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["keys", "stores", "options"])
+    assert result.exit_code == 0
+    assert "No store options configured" in result.output
+
+
+def test_keys_stores_options_set_and_list(monkeypatch, tmpdir):
+    """Test setting and listing options"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set an option
+    result = runner.invoke(
+        cli, ["keys", "stores", "options", "set", "json", "key1", "value1"]
+    )
+    assert result.exit_code == 0
+    assert "Set key1=value1 for store 'json'" in result.output
+
+    # List options
+    result2 = runner.invoke(cli, ["keys", "stores", "options"])
+    assert result2.exit_code == 0
+    assert "json:" in result2.output
+    assert "key1: value1" in result2.output
+
+
+def test_keys_stores_options_show(monkeypatch, tmpdir):
+    """Test showing options for a specific store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set some options
+    runner.invoke(cli, ["keys", "stores", "options", "set", "json", "key1", "value1"])
+    runner.invoke(cli, ["keys", "stores", "options", "set", "json", "key2", "value2"])
+
+    # Show options for json store
+    result = runner.invoke(cli, ["keys", "stores", "options", "show", "json"])
+    assert result.exit_code == 0
+    assert "key1: value1" in result.output
+    assert "key2: value2" in result.output
+
+
+def test_keys_stores_options_show_empty(monkeypatch, tmpdir):
+    """Test showing options when none configured for store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["keys", "stores", "options", "show", "json"])
+    assert result.exit_code == 0
+    assert "No options configured for store 'json'" in result.output
+
+
+def test_keys_stores_options_set_invalid_store(monkeypatch, tmpdir):
+    """Test error when setting option for invalid store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["keys", "stores", "options", "set", "invalid", "key", "value"]
+    )
+    assert result.exit_code != 0
+    assert "Store 'invalid' not found" in result.output
+
+
+def test_keys_stores_options_clear_all(monkeypatch, tmpdir):
+    """Test clearing all options for a store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set some options
+    runner.invoke(cli, ["keys", "stores", "options", "set", "json", "key1", "value1"])
+    runner.invoke(cli, ["keys", "stores", "options", "set", "json", "key2", "value2"])
+
+    # Clear all options
+    result = runner.invoke(cli, ["keys", "stores", "options", "clear", "json"])
+    assert result.exit_code == 0
+    assert "Cleared all options for store 'json'" in result.output
+
+    # Verify they're gone
+    result2 = runner.invoke(cli, ["keys", "stores", "options"])
+    assert result2.exit_code == 0
+    assert "No store options configured" in result2.output
+
+
+def test_keys_stores_options_clear_key(monkeypatch, tmpdir):
+    """Test clearing a specific option"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set some options
+    runner.invoke(cli, ["keys", "stores", "options", "set", "json", "key1", "value1"])
+    runner.invoke(cli, ["keys", "stores", "options", "set", "json", "key2", "value2"])
+
+    # Clear one key
+    result = runner.invoke(
+        cli, ["keys", "stores", "options", "clear", "json", "--key", "key1"]
+    )
+    assert result.exit_code == 0
+    assert "Cleared key1 for store 'json'" in result.output
+
+    # Verify key1 is gone but key2 remains
+    result2 = runner.invoke(cli, ["keys", "stores", "options", "show", "json"])
+    assert result2.exit_code == 0
+    assert "key1" not in result2.output
+    assert "key2: value2" in result2.output
+
+
+def test_keys_stores_backward_compatibility(monkeypatch, tmpdir):
+    """Test that llm keys stores still works as before"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Test basic command
+    result = runner.invoke(cli, ["keys", "stores"])
+    assert result.exit_code == 0
+    assert "json (default)" in result.output
+
+    # Test with --verbose
+    result2 = runner.invoke(cli, ["keys", "stores", "--verbose"])
+    assert result2.exit_code == 0
+    assert "json (default)" in result2.output
+    assert "Keys stored:" in result2.output
+
+    # Test explicit list
+    result3 = runner.invoke(cli, ["keys", "stores", "list"])
+    assert result3.exit_code == 0
+    assert "json (default)" in result3.output

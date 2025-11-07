@@ -177,7 +177,17 @@ If you don't specify a store, the default store will be used.
 
 #### Configuring the default store
 
-You can configure which store is used by default by creating a `secret-store-config.json` file in your LLM configuration directory. The path can be found by running:
+You can set the default store using the CLI:
+
+```bash
+# Show current default store
+llm keys stores default
+
+# Set a different default store
+llm keys stores default keychain
+```
+
+Alternatively, you can configure it by creating a `secret-store-config.json` file in your LLM configuration directory. The path can be found by running:
 
 ```bash
 llm keys path
@@ -196,7 +206,28 @@ Then replace `keys.json` with `secret-store-config.json`. For example:
 }
 ```
 
-The `stores` section allows you to pass configuration options to specific store backends. Check the documentation for each store plugin to see what options are available.
+#### Configuring store options
+
+You can configure options for secret stores using the CLI:
+
+```bash
+# Show all configured options
+llm keys stores options
+
+# Show options for a specific store
+llm keys stores options show keychain
+
+# Set an option
+llm keys stores options set keychain service_name my-llm-keys
+
+# Clear all options for a store
+llm keys stores options clear keychain
+
+# Clear a specific option
+llm keys stores options clear keychain --key service_name
+```
+
+The `stores` section in `secret-store-config.json` allows you to pass configuration options to specific store backends. Check the documentation for each store plugin to see what options are available.
 
 ### Passing keys using the --key option
 

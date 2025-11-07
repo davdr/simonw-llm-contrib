@@ -38,6 +38,8 @@ from llm import (
     get_model,
     get_model_aliases,
     get_models_with_aliases,
+    load_secret_store_config,
+    save_secret_store_config,
     user_dir,
     set_alias,
     set_default_model,
@@ -1399,9 +1401,20 @@ def keys_set(name, value, store):
         raise click.ClickException(f"Failed to store secret: {e}")
 
 
-@keys.command(name="stores")
+@keys.group(
+    name="stores",
+    cls=DefaultGroup,
+    default="list",
+    default_if_no_args=True,
+)
+def stores():
+    """Manage secret stores"""
+    pass
+
+
+@stores.command(name="list")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
-def keys_stores(verbose):
+def stores_list(verbose):
     """List available secret stores"""
     stores = get_secret_stores()
     default_store_name = get_default_secret_store_name()
@@ -1417,6 +1430,186 @@ def keys_stores(verbose):
         if verbose:
             keys_count = len(store.list_keys())
             click.echo(f"  Keys stored: {keys_count}")
+
+
+@stores.command(name="default")
+@click.argument("name", required=False)
+def stores_default(name):
+    """Show or set the default secret store
+
+    Example usage:
+
+    \b
+        # Show current default
+        llm keys stores default
+
+        # Set default store
+        llm keys stores default keychain
+    """
+    if name is None:
+        # Show current default
+        default_name = get_default_secret_store_name()
+        if default_name:
+            click.echo(default_name)
+        else:
+            click.echo("No default store set", err=True)
+    else:
+        # Set default
+        available_stores = get_secret_stores()
+        if name not in available_stores:
+            available = ", ".join(sorted(available_stores.keys()))
+            raise click.ClickException(
+                f"Store '{name}' not found. Available stores: {available}"
+            )
+
+        # Load config, update default, save
+        config = load_secret_store_config()
+        config["default_store"] = name
+        save_secret_store_config(config)
+        click.echo(f"Default store set to '{name}'", err=True)
+
+
+@stores.group(
+    cls=DefaultGroup,
+    default="list",
+    default_if_no_args=True,
+)
+def options():
+    """Manage secret store configuration options"""
+    pass
+
+
+@options.command(name="list")
+def options_list():
+    """List configuration options for all stores
+
+    Example usage:
+
+    \b
+        llm keys stores options list
+    """
+    config = load_secret_store_config()
+    store_configs = config.get("stores", {})
+
+    if not store_configs:
+        click.echo("No store options configured", err=True)
+        return
+
+    for store_name in sorted(store_configs.keys()):
+        click.echo(f"{store_name}:")
+        store_options = store_configs[store_name]
+        for key, value in sorted(store_options.items()):
+            click.echo(f"  {key}: {value}")
+
+
+@options.command(name="show")
+@click.argument("store")
+def options_show(store):
+    """Show configuration options for a specific store
+
+    Example usage:
+
+    \b
+        llm keys stores options show keychain
+    """
+    # Validate store exists
+    available_stores = get_secret_stores()
+    if store not in available_stores:
+        available = ", ".join(sorted(available_stores.keys()))
+        raise click.ClickException(
+            f"Store '{store}' not found. Available stores: {available}"
+        )
+
+    config = load_secret_store_config()
+    store_options = config.get("stores", {}).get(store, {})
+
+    if not store_options:
+        click.echo(f"No options configured for store '{store}'", err=True)
+        return
+
+    for key, value in sorted(store_options.items()):
+        click.echo(f"{key}: {value}")
+
+
+@options.command(name="set")
+@click.argument("store")
+@click.argument("key")
+@click.argument("value")
+def options_set(store, key, value):
+    """Set a configuration option for a store
+
+    Example usage:
+
+    \b
+        llm keys stores options set keychain service_name my-llm
+        llm keys stores options set vault url https://vault.example.com
+    """
+    # Validate store exists
+    available_stores = get_secret_stores()
+    if store not in available_stores:
+        available = ", ".join(sorted(available_stores.keys()))
+        raise click.ClickException(
+            f"Store '{store}' not found. Available stores: {available}"
+        )
+
+    # Load config, update option, save
+    config = load_secret_store_config()
+    if "stores" not in config:
+        config["stores"] = {}
+    if store not in config["stores"]:
+        config["stores"][store] = {}
+
+    config["stores"][store][key] = value
+    save_secret_store_config(config)
+
+    click.echo(f"Set {key}={value} for store '{store}'", err=True)
+
+
+@options.command(name="clear")
+@click.argument("store")
+@click.option(
+    "--key", help="Clear only this specific key (if not specified, clears all options)"
+)
+def options_clear(store, key):
+    """Clear configuration options for a store
+
+    Example usage:
+
+    \b
+        # Clear all options for a store
+        llm keys stores options clear keychain
+
+        # Clear specific option
+        llm keys stores options clear keychain --key service_name
+    """
+    # Validate store exists
+    available_stores = get_secret_stores()
+    if store not in available_stores:
+        available = ", ".join(sorted(available_stores.keys()))
+        raise click.ClickException(
+            f"Store '{store}' not found. Available stores: {available}"
+        )
+
+    config = load_secret_store_config()
+    store_configs = config.get("stores", {})
+
+    if store not in store_configs:
+        click.echo(f"No options configured for store '{store}'", err=True)
+        return
+
+    if key:
+        # Clear specific key
+        if key in store_configs[store]:
+            del store_configs[store][key]
+            save_secret_store_config(config)
+            click.echo(f"Cleared {key} for store '{store}'", err=True)
+        else:
+            click.echo(f"Option '{key}' not set for store '{store}'", err=True)
+    else:
+        # Clear all options
+        del config["stores"][store]
+        save_secret_store_config(config)
+        click.echo(f"Cleared all options for store '{store}'", err=True)
 
 
 @cli.group(
