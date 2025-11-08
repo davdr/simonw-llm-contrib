@@ -75,8 +75,14 @@ json (default)
 
 **Enhanced existing files:**
 - `llm/__init__.py` - Registry, configuration, and integration (~190 lines added)
-- `llm/cli.py` - Added `--store` option and `stores` subcommand (~140 lines added)
+- `llm/cli.py` - Added `--store` option, stores group with default and options subcommands (~340 lines added)
 - `llm/plugins.py` - Registered JSON store as default plugin
+
+**Documentation:**
+- `docs/setup.md` - Complete user guide for secret stores (~110 lines added)
+- `docs/plugins/plugin-hooks.md` - Plugin developer documentation (~150 lines)
+- `docs/plugins/plugin-utilities.md` - Updated get_key() documentation
+- `docs/changelog.md` - Comprehensive release notes
 
 ### Key Features
 
@@ -87,8 +93,12 @@ json (default)
        register(MySecretStore())
    ```
 
-2. **Store Selection**
+2. **Store Selection and Discovery**
    ```bash
+   # List available stores
+   llm keys stores
+   llm keys stores --verbose
+
    # Use default store
    llm keys set openai
 
@@ -99,7 +109,34 @@ json (default)
    llm keys list --store json
    ```
 
-3. **Configuration Support**
+3. **Default Store Management (CLI)**
+   ```bash
+   # Show current default store
+   llm keys stores default
+
+   # Set default store
+   llm keys stores default keychain
+   ```
+
+4. **Store Options Management (CLI)**
+   ```bash
+   # List all configured options
+   llm keys stores options
+
+   # Show options for specific store
+   llm keys stores options show vault
+
+   # Set a configuration option
+   llm keys stores options set vault url https://vault.example.com
+
+   # Clear all options for a store
+   llm keys stores options clear vault
+
+   # Clear specific option
+   llm keys stores options clear vault --key url
+   ```
+
+5. **Configuration File Support** (alternative to CLI)
    ```json
    {
      "default_store": "keychain",
@@ -112,7 +149,7 @@ json (default)
    }
    ```
 
-4. **Updated Priority Hierarchy** (in `get_key()`):
+6. **Updated Priority Hierarchy** (in `get_key()`):
    - Explicit `--key` parameter (highest priority)
    - Secret store (configured backend)
    - Legacy `keys.json` (backward compatibility)
@@ -121,13 +158,16 @@ json (default)
 
 ### Testing
 
-**41 new tests added** across 4 new test files:
+**53 new tests added** across 4 new test files:
 - `tests/test_secret_stores.py` - ABC and registry tests (16 tests)
 - `tests/test_json_secret_store.py` - JSON store implementation (13 tests)
 - `tests/test_secret_store_config.py` - Configuration loading (9 tests)
-- `tests/test_keys.py` - CLI command tests (3 new tests)
+- `tests/test_keys.py` - CLI command tests (15 new tests: 3 for stores discovery + 12 for CLI management)
 
-**Total: 113 tests passing** (72 baseline + 41 new)
+**Total: 86 tests passing** (65 baseline in test_llm.py + 21 in test_keys.py)
+- Original baseline: 72 tests (65 in test_llm.py + 7 in test_keys.py)
+- New infrastructure tests: 38 tests (in test_secret_stores.py, test_json_secret_store.py, test_secret_store_config.py)
+- New CLI tests: 15 tests (in test_keys.py)
 
 **Test coverage highlights:**
 - All abstract base class behavior
@@ -138,6 +178,10 @@ json (default)
 - Test isolation with state save/restore
 - Edge cases (corrupted files, missing configs, etc.)
 - Backward compatibility scenarios
+- CLI commands for store discovery (list, verbose)
+- CLI commands for default store management (show, set)
+- CLI commands for options management (list, show, set, clear)
+- Config file persistence and updates
 
 ### Code Quality
 
@@ -258,22 +302,33 @@ The implementation was done incrementally with clear commits:
 - Phase 6: Update CLI Commands
 - Phase 9: Code Quality (black formatting)
 - Phase 11: Add Store Discovery Command
+- Phase 12: Documentation Updates - Complete user and plugin developer documentation
+- Phase 13: CLI for Secret Store Configuration - Add default and options management commands
 
 Each phase was tested independently before proceeding.
 
 ## Changes Summary
 
 ```
-11 files changed, 1472 insertions(+), 226 deletions(-)
+14 files changed, 2744 insertions(+), 247 deletions(-)
 ```
 
-**New files (7):**
+**New files (5):**
 - `llm/secret_stores.py` - Abstract base class
-- `llm/default_plugins/json_secret_store.py` - JSON plugin
-- `tests/test_secret_stores.py` - ABC tests
-- `tests/test_json_secret_store.py` - JSON tests
-- `tests/test_secret_store_config.py` - Config tests
-- Plus updated existing files
+- `llm/default_plugins/json_secret_store.py` - JSON plugin (101 lines)
+- `tests/test_json_secret_store.py` - JSON store tests (197 lines)
+- `tests/test_secret_store_config.py` - Config tests (208 lines)
+- `PR.md` - This comprehensive PR description (310 lines)
+
+**Significantly enhanced files:**
+- `llm/__init__.py` - Registry, configuration (+147 lines)
+- `llm/cli.py` - Store management commands (+330 lines)
+- `tests/test_keys.py` - CLI tests (+215 lines)
+- `tests/test_secret_stores.py` - ABC and registry tests (+148 lines)
+- `docs/setup.md` - User documentation (+113 lines)
+- `docs/plugins/plugin-hooks.md` - Plugin developer docs (+154 lines)
+- `docs/changelog.md` - Release notes (+31 lines)
+- `PLAN.md` - Detailed implementation tracking (+1023 lines)
 
 ## Testing Instructions
 
@@ -281,17 +336,67 @@ Each phase was tested independently before proceeding.
 # Run all tests
 pytest tests/test_llm.py tests/test_keys.py -v
 
-# Try the new commands
-llm keys stores
-llm keys stores --verbose
-llm keys set mykey --store json
-llm keys get mykey
-llm keys list
+# Store discovery
+llm keys stores                    # List available stores
+llm keys stores --verbose          # With key counts
+llm keys stores list               # Explicit list command
+
+# Default store management
+llm keys stores default            # Show current default
+llm keys stores default json       # Set default store
+
+# Options management
+llm keys stores options            # List all configured options
+llm keys stores options show json  # Show options for specific store
+llm keys stores options set json timeout 30  # Set an option
+llm keys stores options clear json --key timeout  # Clear specific option
+llm keys stores options clear json # Clear all options for store
+
+# Key management with stores
+llm keys set mykey --store json    # Set key in specific store
+llm keys get mykey                 # Get key from default store
+llm keys list                      # List keys in default store
+llm keys list --store json         # List from specific store
 
 # Verify backward compatibility
-llm keys set openai  # Works exactly as before
-llm keys get openai  # Works exactly as before
+llm keys set openai                # Works exactly as before
+llm keys get openai                # Works exactly as before
+llm keys                           # Lists keys as before
 ```
+
+## User-Friendly Configuration
+
+A key focus of this PR is making the secret store system **easy to use without manual file editing**. All configuration can be done via intuitive CLI commands:
+
+### CLI-First Approach
+
+Users never need to manually edit `secret-store-config.json`. Everything can be managed via commands that follow familiar patterns from `llm models`:
+
+```bash
+# Discovery - see what's available
+llm keys stores
+llm keys stores --verbose
+
+# Configuration - set defaults and options
+llm keys stores default keychain
+llm keys stores options set vault url https://vault.example.com
+
+# Usage - works seamlessly
+llm keys set openai
+```
+
+### Comprehensive Documentation
+
+- **User docs** (`docs/setup.md`) - Step-by-step guides with examples
+- **Plugin developer docs** (`docs/plugins/plugin-hooks.md`) - Complete API reference with real-world examples
+- **Utility docs** (`docs/plugins/plugin-utilities.md`) - Updated get_key() behavior
+- **Changelog** (`docs/changelog.md`) - Detailed feature list
+
+All documentation emphasizes:
+- CLI-first workflow (manual config file editing as alternative)
+- Backward compatibility
+- Security best practices
+- Real-world examples (OS Keychain integration, Vault setup)
 
 ## Why This Matters
 
