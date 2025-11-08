@@ -64,6 +64,49 @@ json (default)
   Keys stored: 3
 ```
 
+### 6. **Consistent Command Structure: Why `llm keys stores` not `llm keystores`**
+
+We deliberately chose `llm keys stores` over `llm keystores` for several important reasons:
+
+**1. Follows Existing Organization**
+- `llm keys` is already an established command group for key management
+- Existing commands: `llm keys set`, `llm keys get`, `llm keys list`, `llm keys path`
+- Adding `stores` as a subcommand keeps all key-related functionality together in one place
+
+**2. Maintains Discoverability**
+- Users who know `llm keys` naturally discover `llm keys stores` through help text
+- Running `llm keys --help` shows all key management commands including the new `stores` subcommand
+- Creates a logical hierarchy: manage keys → see where keys are stored
+
+**3. Semantic Clarity**
+- "keys" = managing the keys themselves (set, get, list, delete)
+- "stores" = managing where those keys are stored (backends, configuration)
+- The two-word form clearly separates the concept: "keys" (what) from "stores" (where)
+
+**4. Consistency with `llm models` Pattern**
+- `llm models` is a group with `llm models list`, `llm models default`, `llm models options`
+- `llm keys` mirrors this pattern with `llm keys stores`, `llm keys stores default`, `llm keys stores options`
+- Users already familiar with model management will understand key management
+
+**5. Avoids Top-Level Pollution**
+- `llm keystores` would create a new top-level command group
+- Keeps the top-level command space clean: `llm prompt`, `llm chat`, `llm keys`, `llm models`, etc.
+- Prevents confusion: is "keystore" one word or two? The space makes it unambiguous
+
+**Example of the clear hierarchy:**
+```bash
+llm keys                     # List all keys
+llm keys set openai          # Manage a key
+llm keys stores              # See available storage backends
+llm keys stores default      # Configure which backend to use
+llm keys stores options      # Configure backend-specific options
+```
+
+This structure makes it immediately obvious that:
+- Everything under `llm keys` relates to API key management
+- The `stores` subcommand specifically manages storage backends
+- All configuration is logically grouped together
+
 ## What's Included
 
 ### Core Infrastructure
