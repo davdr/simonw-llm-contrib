@@ -17,6 +17,7 @@ This new system enables plugins to provide alternative storage backends includin
   - `llm keys stores options set <store> <key> <value>` - set a configuration option
   - `llm keys stores options clear <store>` - clear all options for a store
   - `llm keys stores options clear <store> --key <key>` - clear a specific option
+- New `llm keys delete` command to delete stored secrets, with `--store` option to specify which store and `--yes` flag to skip confirmation.
 - Added `--store` option to `llm keys set`, `llm keys get`, and `llm keys list` commands to specify which store to use.
 - New `secret-store-config.json` configuration file for setting the default store and store-specific configuration options (can also be managed via CLI).
 - New `llm.SecretStore` abstract base class defining the interface for secret store plugins.

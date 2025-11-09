@@ -325,3 +325,132 @@ def test_keys_stores_backward_compatibility(monkeypatch, tmpdir):
     result3 = runner.invoke(cli, ["keys", "stores", "list"])
     assert result3.exit_code == 0
     assert "json (default)" in result3.output
+
+
+def test_keys_delete_basic(monkeypatch, tmpdir):
+    """Test deleting a key from default store with --yes flag"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set a key first
+    runner.invoke(cli, ["keys", "set", "test-key"], input="test-value")
+
+    # Verify it exists
+    result = runner.invoke(cli, ["keys", "get", "test-key"])
+    assert result.exit_code == 0
+    assert "test-value" in result.output
+
+    # Delete it with --yes flag
+    result = runner.invoke(cli, ["keys", "delete", "test-key", "--yes"])
+    assert result.exit_code == 0
+    assert "deleted from store 'json'" in result.output
+
+    # Verify it's gone
+    result = runner.invoke(cli, ["keys", "get", "test-key"])
+    assert result.exit_code != 0
+    assert "not found" in result.output
+
+
+def test_keys_delete_with_store(monkeypatch, tmpdir):
+    """Test deleting a key from specific store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set a key
+    runner.invoke(
+        cli, ["keys", "set", "test-key", "--store", "json"], input="test-value"
+    )
+
+    # Delete from specific store
+    result = runner.invoke(
+        cli, ["keys", "delete", "test-key", "--store", "json", "--yes"]
+    )
+    assert result.exit_code == 0
+    assert "deleted from store 'json'" in result.output
+
+
+def test_keys_delete_nonexistent(monkeypatch, tmpdir):
+    """Test error when deleting non-existent key"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["keys", "delete", "nonexistent", "--yes"])
+    assert result.exit_code != 0
+    assert "not found in store" in result.output
+
+
+def test_keys_delete_invalid_store(monkeypatch, tmpdir):
+    """Test error when specifying invalid store"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        cli, ["keys", "delete", "somekey", "--store", "invalid", "--yes"]
+    )
+    assert result.exit_code != 0
+    assert "not found" in result.output
+    assert "Available stores" in result.output
+
+
+def test_keys_delete_verify_removed(monkeypatch, tmpdir):
+    """Test that key is actually removed from storage"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set a key
+    runner.invoke(cli, ["keys", "set", "test-key"], input="test-value")
+
+    # Delete it
+    runner.invoke(cli, ["keys", "delete", "test-key", "--yes"])
+
+    # Verify it doesn't appear in list
+    result = runner.invoke(cli, ["keys", "list"])
+    assert result.exit_code == 0
+    assert "test-key" not in result.output
+
+
+def test_keys_delete_other_keys_remain(monkeypatch, tmpdir):
+    """Test that deleting one key doesn't affect others"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set multiple keys
+    runner.invoke(cli, ["keys", "set", "key1"], input="value1")
+    runner.invoke(cli, ["keys", "set", "key2"], input="value2")
+    runner.invoke(cli, ["keys", "set", "key3"], input="value3")
+
+    # Delete one key
+    runner.invoke(cli, ["keys", "delete", "key2", "--yes"])
+
+    # Verify the other keys still exist
+    result = runner.invoke(cli, ["keys", "list"])
+    assert result.exit_code == 0
+    assert "key1" in result.output
+    assert "key2" not in result.output
+    assert "key3" in result.output
+
+
+def test_keys_delete_confirmation_cancelled(monkeypatch, tmpdir):
+    """Test that deletion is cancelled when user says no"""
+    user_path = str(tmpdir / "user/keys")
+    monkeypatch.setenv("LLM_USER_PATH", user_path)
+    runner = CliRunner()
+
+    # Set a key
+    runner.invoke(cli, ["keys", "set", "test-key"], input="test-value")
+
+    # Try to delete without --yes, answer 'n' to confirmation
+    result = runner.invoke(cli, ["keys", "delete", "test-key"], input="n\n")
+    assert result.exit_code == 0
+    assert "Cancelled" in result.output
+
+    # Verify key still exists
+    result = runner.invoke(cli, ["keys", "get", "test-key"])
+    assert result.exit_code == 0
+    assert "test-value" in result.output

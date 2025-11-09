@@ -122,6 +122,24 @@ You can list the names of keys that have been set using this command:
 llm keys
 ```
 
+To delete a stored key, use the `llm keys delete` command:
+
+```bash
+llm keys delete openai
+```
+
+You will be prompted to confirm the deletion. To skip the confirmation, use the `--yes` flag:
+
+```bash
+llm keys delete openai --yes
+```
+
+When multiple stores are available, you can specify which store to delete from:
+
+```bash
+llm keys delete openai --store keychain
+```
+
 Keys that are stored in this way live in a file called `keys.json`. This file is located at the path shown when you run the following command:
 
 ```bash

@@ -1401,6 +1401,72 @@ def keys_set(name, value, store):
         raise click.ClickException(f"Failed to store secret: {e}")
 
 
+@keys.command(name="delete")
+@click.argument("name")
+@click.option(
+    "--store",
+    default=None,
+    help="Secret store to delete from (default: configured default store)",
+)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+def keys_delete(name, store, yes):
+    """Delete a stored secret key
+
+    Example usage:
+
+    \b
+        # Delete from default store
+        llm keys delete openai
+
+        # Delete from specific store
+        llm keys delete openai --store json
+
+        # Skip confirmation
+        llm keys delete openai --yes
+    """
+    # Get the appropriate store
+    if store:
+        secret_store = get_secret_store(store)
+        if not secret_store:
+            available = ", ".join(sorted(get_secret_stores().keys()))
+            raise click.ClickException(
+                f"Secret store '{store}' not found. Available stores: {available}"
+            )
+        store_name = store
+    else:
+        # Use default store
+        default_store_name = get_default_secret_store_name()
+        secret_store = get_secret_store(default_store_name)
+        store_name = default_store_name
+
+    # Check if key exists
+    existing_value = secret_store.get(name)
+    if not existing_value:
+        raise click.ClickException(f"Secret '{name}' not found in store '{store_name}'")
+
+    # Confirm deletion unless --yes
+    if not yes:
+        if not click.confirm(
+            f"Delete secret '{name}' from store '{store_name}'?", default=False
+        ):
+            click.echo("Cancelled", err=True)
+            return
+
+    # Delete the key
+    success = secret_store.delete(name)
+    if success:
+        click.echo(f"Secret '{name}' deleted from store '{store_name}'", err=True)
+    else:
+        raise click.ClickException(
+            f"Failed to delete secret '{name}' from store '{store_name}'"
+        )
+
+
 @keys.group(
     name="stores",
     cls=DefaultGroup,
