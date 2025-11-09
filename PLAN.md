@@ -1899,6 +1899,227 @@ llm keys stores options clear keychain --key service_name
 
 ---
 
+## Phase 14: Add `llm keys delete` Command
+
+**Goal:** Expose the `SecretStore.delete()` method via a CLI command to allow users to delete stored API keys.
+
+**Rationale:** The `SecretStore` abstract base class includes a `delete()` method, and `JsonSecretStore` implements it, but there is currently no CLI command to expose this functionality to users. Users can set, get, and list keys, but cannot delete them without manually editing the `keys.json` file or configuration. This is a clear gap in functionality.
+
+**Current State:**
+- ✅ `SecretStore.delete()` is defined in the abstract base class
+- ✅ `JsonSecretStore.delete()` is implemented and tested
+- ❌ No `llm keys delete` CLI command exists
+- Users can currently: `set`, `get`, `list`, `path` keys
+- Users cannot: delete keys via CLI
+
+**Design Choice:** Follow the existing pattern used by `llm keys get` and `llm keys set`
+
+The command should:
+- Accept a key name as argument
+- Support optional `--store` flag to specify which store to delete from
+- Default to the default store if `--store` is not specified
+- Provide clear success/error messages
+- Follow Click conventions for confirmation (optional `--yes` flag)
+
+### Proposed CLI Structure
+
+```bash
+# Delete from default store
+llm keys delete openai
+
+# Delete from specific store
+llm keys delete openai --store vault
+
+# Delete without confirmation prompt (for scripts)
+llm keys delete openai --yes
+```
+
+### Implementation Steps
+
+#### 14.1: Implement `llm keys delete` Command
+
+**Purpose:** Allow users to delete stored API keys via CLI
+
+**Implementation:**
+```python
+@keys.command(name="delete")
+@click.argument("name")
+@click.option(
+    "--store",
+    default=None,
+    help="Secret store to delete from (default: configured default store)",
+)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+def keys_delete(name, store, yes):
+    """Delete a stored secret key
+
+    Example usage:
+
+    \b
+        # Delete from default store
+        llm keys delete openai
+
+        # Delete from specific store
+        llm keys delete openai --store json
+
+        # Skip confirmation
+        llm keys delete openai --yes
+    """
+    # Get the appropriate store
+    if store:
+        secret_store = get_secret_store(store)
+        if not secret_store:
+            raise click.ClickException(f"Secret store '{store}' not found")
+        store_name = store
+    else:
+        # Use default store
+        default_store_name = get_default_secret_store_name()
+        secret_store = get_secret_store(default_store_name)
+        store_name = default_store_name
+
+    # Check if key exists
+    existing_value = secret_store.get(name)
+    if not existing_value:
+        raise click.ClickException(
+            f"Secret '{name}' not found in store '{store_name}'"
+        )
+
+    # Confirm deletion unless --yes
+    if not yes:
+        if not click.confirm(
+            f"Delete secret '{name}' from store '{store_name}'?",
+            default=False,
+        ):
+            click.echo("Cancelled", err=True)
+            return
+
+    # Delete the key
+    success = secret_store.delete(name)
+    if success:
+        click.echo(f"Secret '{name}' deleted from store '{store_name}'", err=True)
+    else:
+        raise click.ClickException(
+            f"Failed to delete secret '{name}' from store '{store_name}'"
+        )
+```
+
+**Files to modify:**
+- `llm/cli.py`
+
+**Testing:**
+- [ ] Test deleting existing key from default store
+- [ ] Test deleting existing key from specific store
+- [ ] Test error when deleting non-existent key
+- [ ] Test error when specifying invalid store
+- [ ] Test confirmation prompt (interactive)
+- [ ] Test `--yes` flag to skip confirmation
+- [ ] Test that key is actually removed from storage
+- [ ] Test that other keys remain unaffected
+
+**Success Criteria:**
+- Command works correctly
+- Follows existing CLI patterns
+- Proper error handling
+- At least 5 unit tests added
+
+#### 14.2: Add Tests
+
+Create comprehensive tests in `tests/test_keys.py`:
+
+**Test scenarios:**
+- [ ] `test_keys_delete_basic` - delete a key from default store
+- [ ] `test_keys_delete_with_store` - delete from specific store
+- [ ] `test_keys_delete_nonexistent` - error when key doesn't exist
+- [ ] `test_keys_delete_invalid_store` - error when store doesn't exist
+- [ ] `test_keys_delete_verify_removed` - verify key is actually gone
+- [ ] `test_keys_delete_other_keys_remain` - other keys unaffected
+- [ ] `test_keys_delete_yes_flag` - --yes flag works
+
+**Success Criteria:**
+- All new tests pass
+- Existing tests still pass
+- Total test count increases appropriately (86 → 93+ tests)
+
+#### 14.3: Run Tests and Format
+
+- [ ] Run `pytest tests/test_llm.py tests/test_keys.py -v`
+- [ ] Run `black llm/cli.py tests/test_keys.py`
+- [ ] Verify all tests pass after formatting
+
+**Success Criteria:**
+- All tests pass (93+ total)
+- Code is formatted with black
+
+#### 14.4: Update Documentation
+
+**Files to update:**
+
+**docs/setup.md:**
+- [ ] Add `llm keys delete` to the key management section
+- [ ] Show example of deleting keys
+- [ ] Mention confirmation prompt and `--yes` flag
+
+**Example addition:**
+```markdown
+To delete a stored key:
+
+```bash
+# Delete from default store (will prompt for confirmation)
+llm keys delete openai
+
+# Delete from specific store
+llm keys delete openai --store json
+
+# Skip confirmation (useful in scripts)
+llm keys delete openai --yes
+```
+```
+
+**docs/changelog.md:**
+- [ ] Add entry for new `llm keys delete` command
+
+**Example entry:**
+```markdown
+- New `llm keys delete` command to remove stored API keys via CLI
+  - Supports `--store` option to specify which store to delete from
+  - Includes confirmation prompt (can be skipped with `--yes` flag)
+  - Follows existing CLI patterns for consistency
+```
+
+**Success Criteria:**
+- Documentation is clear and accurate
+- Examples are tested and work
+- Follows existing documentation style
+
+#### 14.5: Commit and Push
+
+- [ ] Commit all changes with descriptive message
+- [ ] Update PLAN.md with completion status
+- [ ] Push to branch
+
+**Success Criteria:**
+- All changes committed and pushed
+- PLAN.md updated
+
+### Success Criteria for Phase 14
+
+- [ ] `llm keys delete` command works correctly
+- [ ] Supports `--store` option
+- [ ] Includes confirmation prompt (skippable with `--yes`)
+- [ ] At least 7 new tests added
+- [ ] All tests pass (93+ total)
+- [ ] Documentation updated
+- [ ] Code formatted with black
+- [ ] Follows existing CLI patterns
+- [ ] No breaking changes
+
+---
+
 ## Final Success Criteria Checklist
 
 ✅ **IMPLEMENTATION COMPLETE - ALL CORE CRITERIA MET**
